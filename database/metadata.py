@@ -70,6 +70,9 @@ def bootstrap_schema(settings: Settings) -> None:
     ddls = [path.read_text().encode("utf-8") for path in SCHEMA_FILES]
     with MetadataConnection(settings) as conn:
         with conn.cursor() as cur:
+            # Prerequisite, not schema: knowledge/rag columns use VECTOR(n).
+            # Ships disabled in fresh pgvector databases (CI, new volumes).
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
             for ddl in ddls:
                 cur.execute(ddl)
         conn.commit()
