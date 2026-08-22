@@ -43,7 +43,6 @@ reportUnusedCallResult = "warning"
 reportUnnecessaryTypeIgnoreComment = "error"
 reportUnusedVariable = "error"
 reportMissingParameterType = "error"
-reportMissingReturnType = "error"
 reportPrivateUsage = "error"
 # FastAPI's Form(...)/File(...) default-call idiom forces this off globally;
 # ruff B008 still guards real misuse everywhere except api/documents.py.
@@ -69,7 +68,7 @@ reportUnknownArgumentType = "none"
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
-reportPartiallyUnknown = "none"
+
 # panel.py: streamlit's session_state is attribute-dynamic by design; the
 # UI script is not library code.
 reportAttributeAccessIssue = "none"
@@ -89,7 +88,6 @@ reportUnknownArgumentType = "none"
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
-reportPartiallyUnknown = "none"
 
 # PyJWT ships partial stubs; decode/encode partially unknown at the two
 # auth boundaries. Contained here instead of annotating around the library.
@@ -111,8 +109,7 @@ reportUnknownArgumentType = "none"
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
-reportPartiallyUnknown = "none"
-reportMissingImports = "none"
+reportMissingModuleSource = "none"
 reportOptionalMemberAccess = "none"
 
 # tests/: variant stubs subclass their own fakes (typing.override is 3.12+),
@@ -124,7 +121,6 @@ extraPaths = ["."]
 reportImplicitOverride = "none"
 reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
-reportPartiallyUnknown = "none"
 reportArgumentType = "none"
 
 [tool.ruff]

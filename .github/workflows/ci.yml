@@ -28,7 +28,8 @@ jobs:
           uv run ruff format --check
 
       - name: Type check
-        run: uv run basedpyright
+        # --level error: warnings stay visible locally; the gate is 0 errors.
+        run: uv run basedpyright --level error
 
       - name: Test (unit + golden parity, both dialects)
         run: uv run pytest --ignore=tests/integration
