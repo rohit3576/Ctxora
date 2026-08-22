@@ -1,4 +1,7 @@
 -- Document RAG DDL (PostgreSQL + pgvector).
+-- The extension ships in the pgvector image but is NOT enabled in a fresh
+-- database (CI, a new clone's compose volume). Idempotent: no-op when enabled.
+CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS rag_documents (
     id UUID PRIMARY KEY,

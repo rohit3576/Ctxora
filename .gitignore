@@ -13,5 +13,8 @@ __pycache__/
 .idea/
 .vscode/
 .DS_Store
+
+# Local agent state
+.omo/
 docs/internal/
 docs/fix/
