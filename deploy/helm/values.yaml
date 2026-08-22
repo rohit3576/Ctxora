@@ -1,0 +1,35 @@
+# Values with safe local defaults; override for your cluster.
+replicaCount: 1
+
+image:
+  repository: querypulse
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 120m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Required: map METADATA_DB_*, TELEMETRY_DB_*, LLM_* from your secret store.
+extraEnv: []
+#  - name: METADATA_DB_HOST
+#    value: postgres.database.svc
+#  - name: METADATA_DB_PASSWORD
+#    valueFrom:
+#      secretKeyRef:
+#        name: querypulse
+#        key: metadata-db-password
+
+configDefaults: |
+  # Optional: overrides config/defaults.yaml baked into the image.
+  stores:
+    telemetry:
+      adapter: postgres

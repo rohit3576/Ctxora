@@ -1,0 +1,109 @@
+# QueryPulse behavior configuration.
+#
+# This file is THE integration surface for your data: rename the columns
+# below to match your key-value telemetry table and the agent adapts.
+# Credentials live in environment variables (.env.example documents them).
+
+stores:
+  telemetry:
+    adapter: clickhouse            # clickhouse | postgres
+    mapping:
+      table: "{tenant}_telemetry"  # or a fixed table + tenant_column
+      tenant_column: null          # set if one shared table instead of per-tenant
+      timestamp: timestamp
+      entity_id: device_id
+      key: key
+      value: value
+      extra_dimensions: []         # optional GROUP BY dimensions (site, region…)
+
+  events:
+    enabled: false
+    adapter: clickhouse
+    mapping:
+      table: "{tenant}_events"
+      timestamp: timestamp
+      event_type: event_type
+      entity_id: device_id
+      payload: event_data
+
+agent:
+  default_time_window: "today"
+  row_cap: 1000
+  query_timeout_s: 30
+  aggregation_defaults:
+    "*": average
+    "battery*": latest
+    "*voltage": latest
+    "*temperature*": average
+  title_keywords:
+    - speed
+    - rpm
+    - temperature
+    - battery
+    - fuel
+    - voltage
+    - location
+  digest_turn_threshold: 10
+
+rag:
+  chunk_size: 800
+  chunk_overlap: 120
+  top_k: 5
+  max_upload_mb: 20
+  shared_scope: shared
+  advisor_template: >-
+    Analyze this incident and explain: probable causes, consequences,
+    actions, checklist, and whether operation can continue.
+
+ratelimit:
+  requests_per_minute: 60
+  burst: 10
+
+flags:
+  correction_loop: false
+  assume_first: false
+  session_digest: false
+  streaming: true
+  semantic_examples: false
+  feedback_capture: false
+  ratelimit: false
+  followup: false
+  greeting: false
+
+routing:
+  sql_indicators:
+    - average
+    - maximum
+    - minimum
+    - last
+    - latest
+    - yesterday
+    - today
+    - this week
+    - trend
+    - per
+    - which
+    - when
+    - how many
+    - how much
+    - speed
+    - rpm
+    - temperature
+    - voltage
+    - battery
+    - fuel
+    - uptime
+  rag_indicators:
+    - manual
+    - documentation
+    - how do i
+    - how to
+    - specification
+    - troubleshooting
+    - policy
+    - maintenance
+    - acceptable range
+    - operating range
+    - what should i do
+    - consequences
+    - safety

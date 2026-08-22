@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-defaults
+data:
+  defaults.yaml: |
+{{ .Values.configDefaults | indent 4 }}

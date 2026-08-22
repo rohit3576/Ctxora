@@ -1,0 +1,308 @@
+[project]
+name = "querypulse"
+version = "0.1.0"
+description = "Agentic NL->SQL + RAG engine for high-cardinality telemetry and time-series data"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Rohitashok Pawar" }]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "gunicorn>=23.0",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "pyyaml>=6.0",
+    "psycopg[binary]>=3.2",
+    "pymupdf>=1.28.2",
+    "python-docx>=1.2.0",
+    "openpyxl>=3.1.5",
+    "beautifulsoup4>=4.15.0",
+    "python-multipart>=0.0.32",
+    "pyjwt>=2.13.0",
+]
+
+[project.optional-dependencies]
+clickhouse = ["clickhouse-connect>=0.8"]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.21",
+    "ruff>=0.8",
+    "pytest>=8",
+    "httpx2[http2,brotli,zstd]>=0.28",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.11"
+pythonPlatform = "All"
+include = ["."]
+exclude = ["**/__pycache__", "**/.venv", "**/build", "**/dist", "docs"]
+reportUnusedCallResult = "warning"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedVariable = "error"
+reportMissingParameterType = "error"
+reportMissingReturnType = "error"
+reportPrivateUsage = "error"
+# FastAPI's Form(...)/File(...) default-call idiom forces this off globally;
+# ruff B008 still guards real misuse everywhere except api/documents.py.
+reportCallInDefaultInitializer = "none"
+# Store stubs and protocol-compatible fakes legitimately ignore parameters
+# (they raise immediately or return canned data).
+reportUnusedParameter = "none"
+# types-PYYAML is untyped upstream: yaml.safe_load returns Any at one
+# documented boundary (config/settings.py). Kept as a visible warning there.
+reportAny = "warning"
+# Multiline SQL/prompt strings use implicit concatenation as house style
+# (ruff ISC001/ISC004 mirror this decision).
+reportImplicitStringConcatenation = "none"
+
+# demo/ is a seed script over untyped driver returns (psycopg fetchone -> Any):
+# isolated here instead of polluting library code with narrowing ceremony.
+[[tool.basedpyright.executionEnvironments]]
+root = "demo"
+extraPaths = ["."]
+reportMissingImports = "none"
+reportAny = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportPartiallyUnknown = "none"
+# panel.py: streamlit's session_state is attribute-dynamic by design; the
+# UI script is not library code.
+reportAttributeAccessIssue = "none"
+reportArgumentType = "none"
+reportIndexIssue = "none"
+reportMissingModuleSource = "none"
+reportMissingTypeArgument = "none"
+
+# database/clickhouse/ wraps clickhouse-connect (untyped, optional extra):
+# the package boundary is typed; inside it the untyped library is accepted.
+[[tool.basedpyright.executionEnvironments]]
+root = "database/clickhouse"
+extraPaths = ["."]
+reportMissingImports = "none"
+reportAny = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportPartiallyUnknown = "none"
+
+# PyJWT ships partial stubs; decode/encode partially unknown at the two
+# auth boundaries. Contained here instead of annotating around the library.
+[[tool.basedpyright.executionEnvironments]]
+root = "api/auth"
+extraPaths = ["."]
+# PyJWT ships partial stubs; decode's result is narrowed immediately below.
+reportUnknownMemberType = "none"
+reportGeneralTypeIssues = "none"
+
+# rag/office.py wraps stubs-poor format libraries (pymupdf/docx/openpyxl);
+# everything around it is typed, inside it the untyped libs are accepted.
+[[tool.basedpyright.executionEnvironments]]
+root = "rag/office"
+extraPaths = ["."]
+reportArgumentType = "none"
+reportAny = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownParameterType = "none"
+reportPartiallyUnknown = "none"
+reportMissingImports = "none"
+reportOptionalMemberAccess = "none"
+
+# tests/: variant stubs subclass their own fakes (typing.override is 3.12+),
+# PyJWT's encode is partially untyped where tests mint tokens, and scripted
+# executors index object tuples.
+[[tool.basedpyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["."]
+reportImplicitOverride = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportPartiallyUnknown = "none"
+reportArgumentType = "none"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Formatter conflicts (ruff itself documents these)
+    "COM812",
+    "ISC001",
+    # Docstyle: pick modern conventions
+    "D203",
+    "D213",
+    # Project-specific noise
+    "CPY001",
+    "FBT001",
+    "FBT002",
+    "TD002",
+    "TD003",
+    "FIX002",
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # assert is the point of pytest
+    "ARG",      # fixtures appear unused
+    "PLR2004",  # magic numbers are test data
+    "SLF001",   # tests may touch private members
+    "D",        # test names are the docs
+    "PLR0911",  # scripted fakes branch per scenario by design
+    "C901",     # same
+    "PLC0415",  # fixture-local imports keep setup next to use
+    "PT018",    # compound assertions document multi-part expectations
+    "PLR0912",  # scripted executors branch per query by design
+]
+"api/query.py" = [
+    "N815",     # camelCase fields are the public wire contract
+    "PLR0913",  # orchestration entry points take the stage inputs explicitly
+    "PLR0917",  # same
+    "C901",     # router factory: two endpoints x shared gate in one place
+]
+"api/history.py" = [
+    "N815",     # camelCase fields are the public wire contract
+]
+"api/onboarding.py" = [
+    "C901",     # wizard factory: endpoints x (gate + envelope) in one place
+    "PLR0915",  # same
+    "N815",     # camelCase fields are the public wire contract
+]
+"api/feedback.py" = [
+    "N815",     # camelCase fields are the public wire contract
+]
+"api/documents.py" = [
+    "N815",     # camelCase fields are the public wire contract
+    "B008",     # FastAPI File(...) default is the framework's upload idiom
+    "PLC0415",  # keep office-format imports lazy
+]
+
+"api/rag.py" = [
+    "N815",     # camelCase fields are the public wire contract
+]
+"rag/contracts.py" = [
+    "PLR0913",  # save_document carries the full ingest tuple by interface contract
+    "PLR0917",  # same
+]
+"rag/fake.py" = [
+    "PLR0913",  # mirrors the protocol signature
+    "PLR0917",  # same
+    "ARG002",   # protocol mirrors accept params they do not use
+]
+"rag/store.py" = [
+    "PLR0913",  # mirrors the protocol signature
+    "PLR0917",  # same
+]
+"rag/office/__init__.py" = [
+    "PLC0415",  # format libraries import per call: light paths stay cold
+]
+"rag/office.py" = [
+    "PLC0415",  # format libraries import per call: light paths stay cold
+]
+"rag/parsers.py" = [
+    "PLC0415",  # format libraries import per call: light paths stay cold
+]
+"rag/ingest.py" = [
+    "PLR0913",  # ingest carries the full dependency set explicitly
+    "PLR0917",  # same
+]
+"tests/test_rag_api.py" = [
+    "N815",     # wire-view models mirror the camelCase contract
+]
+"rag/rag_flow.py" = [
+    "PLC0415",  # keep parse-time imports near their single use
+    "PLR0913",  # advise carries the full incident context explicitly
+    "PLR0917",  # same
+]
+"feedback/contracts.py" = [
+    "PLR0913",  # upsert carries the full example tuple by interface contract
+    "PLR0917",  # same
+]
+"feedback/fake.py" = [
+    "PLR0913",  # mirrors the protocol signature
+    "PLR0917",  # same
+]
+"feedback/store.py" = [
+    "PLR0913",  # mirrors the protocol signature
+    "PLR0917",  # same
+]
+"feedback/capture.py" = [
+    "PLR0913",  # capture inputs are the request fields
+    "PLR0917",  # same
+]
+"feedback/hooks.py" = [
+    "PLR0913",  # hook carries the full correction context
+    "PLR0917",  # same
+]
+"api/feedback_admin.py" = [
+    "N815",     # camelCase fields are the public wire contract
+    "C901",     # six endpoints x (gate + envelope) in one factory; splitting hurts locality
+    "PLR0915",  # same
+]
+"main.py" = [
+    "PLR0913",  # app factory: one injectable kwarg per collaborator by design
+]
+"agent/pipeline.py" = [
+    "PLR0913",  # orchestration entry points take the stage inputs explicitly
+]
+"agent/prompt_builder.py" = [
+    "PLR0913",  # prompt assembly takes the full knowledge slice set explicitly
+]
+"database/rows.py" = [
+    "C901",     # exhaustive boundary converter: one arm per scalar type
+    "PLR0911",  # same
+]
+"database/clickhouse_store.py" = [
+    "S608",     # identifiers come from trusted config mapping, never user input
+]
+"database/postgres_store.py" = [
+    "S608",     # identifiers come from trusted config mapping, never user input
+]
+"knowledge/store.py" = [
+    "S608",     # static query templates; values always bound via parameters
+]
+"demo/**/*.py" = [
+    "S608",     # static seed SQL, no user input
+    "T201",     # seed script prints progress by design
+    "S311",     # synthetic data, not cryptographic
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["integration: requires live compose services (QUERYPULSE_IT=1)"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
+
+
+

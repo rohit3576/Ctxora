@@ -1,0 +1,93 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run ruff check
+          uv run ruff format --check
+
+      - name: Type check
+        run: uv run basedpyright
+
+      - name: Test (unit + golden parity, both dialects)
+        run: uv run pytest --ignore=tests/integration
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t querypulse:${{ github.sha }} .
+
+  # Live-infra integration: postgres profile on every main push.
+  integration-postgres:
+    runs-on: ubuntu-latest
+    needs: quality
+    if: github.ref == 'refs/heads/main'
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: querypulse
+          POSTGRES_PASSWORD: querypulse
+          POSTGRES_DB: querypulse
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U querypulse"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      METADATA_DB_HOST: localhost
+      METADATA_DB_USER: querypulse
+      METADATA_DB_PASSWORD: querypulse
+      METADATA_DB_NAME: querypulse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run python -c "from database.metadata import bootstrap_schema; from config.settings import get_settings; bootstrap_schema(get_settings())"
+      - run: QUERYPULSE_IT=1 uv run pytest tests/integration -k "not clickhouse"
+
+  # ClickHouse-profile integration: opt-in via the 'clickhouse' PR label.
+  integration-clickhouse:
+    runs-on: ubuntu-latest
+    needs: quality
+    if: contains(github.event.pull_request.labels.*.name, 'clickhouse')
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        ports: ["8123:8123"]
+    env:
+      TELEMETRY_DB_HOST: localhost
+      TELEMETRY_DB_USER: default
+      TELEMETRY_DB_PASSWORD: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --extra clickhouse --frozen
+      - run: QUERYPULSE_IT=1 uv run pytest tests/integration -k "clickhouse"

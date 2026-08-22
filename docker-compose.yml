@@ -1,0 +1,51 @@
+# QueryPulse local stack.
+# Default: metadata Postgres + API. ClickHouse joins with `--profile clickhouse`.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: querypulse-postgres
+    environment:
+      POSTGRES_USER: ${METADATA_DB_USER:-querypulse}
+      POSTGRES_PASSWORD: ${METADATA_DB_PASSWORD:-querypulse}
+      POSTGRES_DB: ${METADATA_DB_NAME:-querypulse}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${METADATA_DB_USER:-querypulse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: querypulse-clickhouse
+    profiles: ["clickhouse"]
+    ports:
+      - "127.0.0.1:8123:8123"
+    ulimits:
+      nofile: 262144
+    volumes:
+      - chdata:/var/lib/clickhouse
+
+  api:
+    build: .
+    container_name: querypulse-api
+    environment:
+      METADATA_DB_HOST: postgres
+      TELEMETRY_DB_HOST: ${TELEMETRY_DB_HOST:-}
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  chdata:
