@@ -13,9 +13,8 @@ uv run pytest                 # unit + golden parity suite
 1. **Docs first.** Anything phase-sized lands as a doc under `docs/phases/`
    and gets reviewed before implementation.
 2. **TDD.** Red → green → refactor. Behavior ships with the tests that lock it.
-3. **Gates before merge:** `ruff check`, `ruff format --check`,
-   `basedpyright --level error`, `pytest` — all clean, no exceptions
-   (`make`-style: see CI).
+3. **Gates before merge:** `ruff check`, `ruff format --check`, `basedpyright`,
+   `pytest` — all clean, no exceptions (`make`-style: see CI).
 4. **Flag-gated features.** New agent stages default OFF in
    `config/defaults.yaml`; flags-off behavior must stay byte-identical.
 

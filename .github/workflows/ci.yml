@@ -28,8 +28,9 @@ jobs:
           uv run ruff format --check
 
       - name: Type check
-        # --level error: warnings stay visible locally; the gate is 0 errors.
-        run: uv run basedpyright --level error
+        # Gate is 0 errors; warnings are visible-by-design (failOnWarnings=false
+        # keeps CI exit codes identical to local runs in every reporter mode).
+        run: uv run basedpyright
 
       - name: Test (unit + golden parity, both dialects)
         run: uv run pytest --ignore=tests/integration

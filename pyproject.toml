@@ -35,6 +35,10 @@ dev = [
 
 [tool.basedpyright]
 typeCheckingMode = "all"
+# Warnings are deliberate visible seams (untyped-library boundaries, tests):
+# the gate is 0 errors. Also makes exit codes identical in CI vs local —
+# GitHub Actions reporter mode counts warnings toward the exit otherwise.
+failOnWarnings = false
 pythonVersion = "3.11"
 pythonPlatform = "All"
 include = ["."]
