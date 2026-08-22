@@ -8,7 +8,7 @@ from feedback.contracts import FeedbackStatus, FeedbackStore
 from feedback.hooks import invalidate_knowledge, normalize_sql
 from llm.client import LLMClient
 
-_logger = logging.getLogger("querypulse.promotion")
+_logger = logging.getLogger("datamind.promotion")
 
 _PROMOTABLE: Final[tuple[FeedbackStatus, ...]] = ("pending", "auto_pending", "approved")
 _REVIEWABLE: Final[tuple[FeedbackStatus, ...]] = ("pending", "auto_pending", "review")

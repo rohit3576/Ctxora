@@ -2,7 +2,7 @@
 replicaCount: 1
 
 image:
-  repository: querypulse
+  repository: datamind
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
@@ -25,7 +25,7 @@ extraEnv: []
 #  - name: METADATA_DB_PASSWORD
 #    valueFrom:
 #      secretKeyRef:
-#        name: querypulse
+#        name: datamind
 #        key: metadata-db-password
 
 configDefaults: |

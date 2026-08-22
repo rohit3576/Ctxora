@@ -1,6 +1,6 @@
 """Integration tests against live compose services.
 
-Run explicitly: QUERYPULSE_IT=1 uv run pytest tests/integration
+Run explicitly: DATAMIND_IT=1 uv run pytest tests/integration
 Requires: docker compose up -d (+ --profile clickhouse) and seeded demo data
 (uv run python -m demo.seed_demo).
 """
@@ -18,8 +18,8 @@ from knowledge.pg import metadata_query
 from knowledge.store import KnowledgeStore
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("QUERYPULSE_IT") != "1",
-    reason="integration tests run only with QUERYPULSE_IT=1",
+    os.environ.get("DATAMIND_IT") != "1",
+    reason="integration tests run only with DATAMIND_IT=1",
 )
 
 

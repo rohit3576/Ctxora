@@ -19,7 +19,7 @@ from onboarding.wizard import (
     suggest_name,
 )
 
-_logger = logging.getLogger("querypulse.onboarding")
+_logger = logging.getLogger("datamind.onboarding")
 
 
 class KeyView(BaseModel):

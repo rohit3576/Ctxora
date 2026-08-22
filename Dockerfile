@@ -1,4 +1,4 @@
-# QueryPulse API image: slim, non-root, uv-managed deps.
+# DataMind API image: slim, non-root, uv-managed deps.
 
 FROM python:3.11-slim AS builder
 
@@ -16,12 +16,12 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.11-slim
 
-RUN groupadd --system querypulse && useradd --system --gid querypulse querypulse
+RUN groupadd --system datamind && useradd --system --gid datamind datamind
 
 WORKDIR /app
 COPY --from=builder /app /app
 
-USER querypulse
+USER datamind
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

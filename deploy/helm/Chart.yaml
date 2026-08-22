@@ -1,6 +1,6 @@
 apiVersion: v2
-name: querypulse
-description: Agentic NL-to-SQL + RAG engine for high-cardinality telemetry
+name: datamind
+description: AI platform for reasoning over knowledge, databases, and real-time data
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

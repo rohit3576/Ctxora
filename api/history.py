@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 from api.schemas import Envelope
 from memory.contracts import MemoryStore
 
-_logger = logging.getLogger("querypulse.history")
+_logger = logging.getLogger("datamind.history")
 
 _ROW_TYPE = dict[str, float | int | str | bool | None]
 

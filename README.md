@@ -1,12 +1,12 @@
-# QueryPulse
+# DataMind
 
-**An open-source agentic NL→SQL + RAG engine for high-cardinality telemetry and time-series data.**
+**An open-source AI platform for reasoning over knowledge, databases, and real-time data.**
 
 Point it at any key-value telemetry database (`timestamp + entity + key + value`), and your users can ask:
 
 > "What was the average RPM of truck-102 yesterday?"
 
-…in plain English. QueryPulse resolves the right keys from your registry, generates validated **read-only** SQL for your engine (ClickHouse and PostgreSQL/Timescale are tested peers), executes it safely, and explains the result — with conversation memory, a correction loop, a human-reviewed feedback flywheel, and document RAG with cited sources.
+…in plain English. DataMind resolves the right keys from your registry, generates validated **read-only** SQL for your engine (ClickHouse and PostgreSQL/Timescale are tested peers), executes it safely, and explains the result — with conversation memory, a correction loop, a human-reviewed feedback flywheel, and document RAG with cited sources.
 
 ```text
 User question → auth + rate limit → intent routing ─┬→ SQL agent: key resolution (RAG over your registry)
@@ -80,6 +80,14 @@ names, activate — all through `/v1/onboarding/*` (or the demo panel).
 `ruff check` · `ruff format --check` · `basedpyright` (mode=all, 0 errors) ·
 `pytest` — 313+ tests including a 20-question golden parity suite that runs
 every question against **both** storage engines.
+
+## Resources
+
+- Spec: [`docs/blueprint/IMPLEMENTATION_BLUEPRINT.md`](docs/blueprint/IMPLEMENTATION_BLUEPRINT.md)
+- Architecture: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md)
+- Phase logs: [`docs/phases/`](docs/phases/)
+- Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) · Security: [`SECURITY.md`](SECURITY.md)
+- API reference: run the server and open `/docs` (OpenAPI UI)
 
 ## License
 

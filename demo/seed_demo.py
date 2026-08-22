@@ -2,10 +2,10 @@
 
 Usage:
     uv run python -m demo.seed_demo            # metadata (PG) + telemetry
-    QUERYPULSE_ADAPTER=postgres uv run python -m demo.seed_demo
+    DATAMIND_ADAPTER=postgres uv run python -m demo.seed_demo
 
 Telemetry goes to ClickHouse (default adapter in defaults.yaml) or to the
-metadata Postgres when QUERYPULSE_ADAPTER=postgres (simplest local demo).
+metadata Postgres when DATAMIND_ADAPTER=postgres (simplest local demo).
 """
 
 import datetime
@@ -221,14 +221,14 @@ def main() -> None:
     settings = get_settings()
     seed_metadata(settings)
     rows = generate_rows()
-    adapter = os.environ.get("QUERYPULSE_ADAPTER", "clickhouse")
+    adapter = os.environ.get("DATAMIND_ADAPTER", "clickhouse")
     match adapter:
         case "postgres":
             seed_telemetry_postgres(settings, rows)
         case "clickhouse":
             seed_telemetry_clickhouse(settings, rows)
         case _:
-            msg = f"unknown QUERYPULSE_ADAPTER: {adapter}"
+            msg = f"unknown DATAMIND_ADAPTER: {adapter}"
             raise SystemExit(msg)
 
 

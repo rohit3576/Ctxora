@@ -1,6 +1,6 @@
 # Security Notes
 
-QueryPulse executes LLM-generated SQL against your telemetry store. The
+DataMind executes LLM-generated SQL against your telemetry store. The
 safety model is layered:
 
 ## SQL safety

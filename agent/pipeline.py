@@ -28,7 +28,7 @@ from knowledge.store import KnowledgeStore
 from llm.client import LLMClient
 from memory.digest import DigestCache
 
-_logger = logging.getLogger("querypulse.pipeline")
+_logger = logging.getLogger("datamind.pipeline")
 
 StageObserver = Callable[[str], None]
 

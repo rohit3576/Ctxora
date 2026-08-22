@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -t querypulse:${{ github.sha }} .
+        run: docker build -t datamind:${{ github.sha }} .
 
   # Live-infra integration: postgres profile on every main push.
   integration-postgres:
@@ -50,18 +50,18 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: querypulse
-          POSTGRES_PASSWORD: querypulse
-          POSTGRES_DB: querypulse
+          POSTGRES_USER: datamind
+          POSTGRES_PASSWORD: datamind
+          POSTGRES_DB: datamind
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U querypulse"
+          --health-cmd "pg_isready -U datamind"
           --health-interval 10s --health-timeout 5s --health-retries 10
     env:
       METADATA_DB_HOST: localhost
-      METADATA_DB_USER: querypulse
-      METADATA_DB_PASSWORD: querypulse
-      METADATA_DB_NAME: querypulse
+      METADATA_DB_USER: datamind
+      METADATA_DB_PASSWORD: datamind
+      METADATA_DB_NAME: datamind
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -69,7 +69,7 @@ jobs:
           python-version: "3.12"
       - run: uv sync --frozen
       - run: uv run python -c "from database.metadata import bootstrap_schema; from config.settings import get_settings; bootstrap_schema(get_settings())"
-      - run: QUERYPULSE_IT=1 uv run pytest tests/integration -k "not clickhouse"
+      - run: DATAMIND_IT=1 uv run pytest tests/integration -k "not clickhouse"
 
   # ClickHouse-profile integration: opt-in via the 'clickhouse' PR label.
   integration-clickhouse:
@@ -90,4 +90,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --extra clickhouse --frozen
-      - run: QUERYPULSE_IT=1 uv run pytest tests/integration -k "clickhouse"
+      - run: DATAMIND_IT=1 uv run pytest tests/integration -k "clickhouse"

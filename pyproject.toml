@@ -1,7 +1,7 @@
 [project]
-name = "querypulse"
+name = "datamind"
 version = "0.1.0"
-description = "Agentic NL->SQL + RAG engine for high-cardinality telemetry and time-series data"
+description = "AI platform for reasoning over knowledge, databases, and real-time data"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Rohitashok Pawar" }]
@@ -262,6 +262,9 @@ fixable = ["ALL"]
     "C901",     # exhaustive boundary converter: one arm per scalar type
     "PLR0911",  # same
 ]
+"database/clickhouse/gateway.py" = [
+    "PLC0415",  # clickhouse-connect is an optional extra; import stays lazy
+]
 "database/clickhouse_store.py" = [
     "S608",     # identifiers come from trusted config mapping, never user input
 ]
@@ -300,7 +303,7 @@ docstring-code-line-length = "dynamic"
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["integration: requires live compose services (QUERYPULSE_IT=1)"]
+markers = ["integration: requires live compose services (DATAMIND_IT=1)"]
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = ["error"]
 

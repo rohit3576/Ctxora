@@ -13,7 +13,7 @@ from llm.client import LLMClient
 from rag.contracts import RagStore
 from rag.rag_flow import UngroundedError, advise, answer_grounded, retrieve
 
-_logger = logging.getLogger("querypulse.rag_api")
+_logger = logging.getLogger("datamind.rag_api")
 
 _ROW_TYPE = dict[str, float | int | str | bool | None]
 

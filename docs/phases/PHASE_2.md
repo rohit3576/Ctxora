@@ -52,7 +52,7 @@ probe (key/event introspection) · readiness-lite check.
 - **Outage tests**: metadata-down -> 503 (sync), probe store-down -> `503 STORE_UNAVAILABLE`
 - **Ping**: verified with 0.05s interval + 0.3s stalling store (`: ping` frames present, `final` still last)
 - **Integration tests** (`tests/integration/test_memory_integration.py`): sessions round-trip,
-  probe cache, knowledge registration — behind `QUERYPULSE_IT=1` (compose), consistent with
+  probe cache, knowledge registration — behind `DATAMIND_IT=1` (compose), consistent with
   the Phase-1 owner decision to skip live infra runs locally
 
 ## Decisions taken (doc defaults)

@@ -22,7 +22,7 @@ from agent.pipeline import AgentDeps
 from api.query import SQLQueryRequest, run_recorded
 from memory.contracts import MemoryStore
 
-_logger = logging.getLogger("querypulse.stream")
+_logger = logging.getLogger("datamind.stream")
 
 _MEDIA_TYPE: Final = "text/event-stream"
 _DEFAULT_PING_INTERVAL_S: Final = 15.0

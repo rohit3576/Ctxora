@@ -9,7 +9,7 @@ from agent.titles import title_for
 from config.settings import AppConfig
 from memory.contracts import MemoryStore, Session, TurnInsert
 
-_logger = logging.getLogger("querypulse.session_flow")
+_logger = logging.getLogger("datamind.session_flow")
 
 
 @dataclass(frozen=True, slots=True)

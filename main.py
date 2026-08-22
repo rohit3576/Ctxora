@@ -1,4 +1,4 @@
-"""QueryPulse application entry point.
+"""DataMind application entry point.
 
 App factory pattern: tests construct isolated apps with overridden
 dependencies (store, knowledge fetcher, LLM, memory); gunicorn binds
@@ -81,7 +81,7 @@ def create_app(
 
     deps = AgentDeps(store=resolved_store, knowledge=knowledge, llm=resolved_llm, config=app_config)
 
-    app = FastAPI(title="QueryPulse", version="0.2.0")
+    app = FastAPI(title="DataMind", version="0.2.0")
     app.state.config = app_config
     app.include_router(build_health_router(resolved_settings, metadata.check_metadata_db))
     app.include_router(

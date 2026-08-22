@@ -24,7 +24,7 @@ ClickHouse, selected by one YAML line. Few-shot retrieval gets the semantic upgr
 | `database/dialects/postgres.py` (verify) | every portability-matrix row covered by golden tests (already locked in Phase 0; re-run here against real queries) |
 | `tests/golden/` | 20-question golden set (from `demo/questions.md` + approved feedback exports), **parametrized by adapter**: same questions, same expected rows, dialect-appropriate SQL snapshots |
 | `agent/knowledge_retriever.py` (extend) | when `flags.semantic_examples`: embed question → cosine over `sql_agent_sql_examples` (`status='approved'`, `embedding IS NOT NULL`), threshold 0.85, top-2, bump `use_count`/`last_used_at`; any failure → keyword path (fail-open); off → keyword only |
-| `demo/seed_demo.py` | `QUERYPULSE_ADAPTER=postgres` seeds telemetry into PG (already implemented in Phase 1 — verified here end-to-end) |
+| `demo/seed_demo.py` | `DATAMIND_ADAPTER=postgres` seeds telemetry into PG (already implemented in Phase 1 — verified here end-to-end) |
 | `docker-compose.yml` | postgres profile for telemetry demo (same PG instance, separate demo table) — no second container needed |
 
 ## Acceptance criteria — results
@@ -37,7 +37,7 @@ ClickHouse, selected by one YAML line. Few-shot retrieval gets the semantic upgr
 - [x] Semantic failure (store/vector error) → keyword path, answer unaffected (fail-open regression test)
 - [x] Flag off → **zero `embed` calls** (asserted on a counting LLM)
 - [x] Empty example registry → semantic path skipped entirely
-- [x] Demo PG seed path verified (`QUERYPULSE_ADAPTER=postgres`: 360 rows, 3 trucks x 5 keys, deterministic)
+- [x] Demo PG seed path verified (`DATAMIND_ADAPTER=postgres`: 360 rows, 3 trucks x 5 keys, deterministic)
 - [x] Gates: **pytest 280 passed + 11 integration skipped · ruff clean · format clean · basedpyright 0 errors**
 
 ## Evidence
@@ -48,7 +48,7 @@ ClickHouse, selected by one YAML line. Few-shot retrieval gets the semantic upgr
   fail-open, flag-off zero-embed, empty-registry skip, store-level threshold/usage unit test
 - `tests/golden/test_golden_parity.py` (41): the double-run parity suite with a golden-local
   richer knowledge registry (7 keys, 12 aliases); shared fixtures untouched
-- Live-DB double-runs remain behind `QUERYPULSE_IT=1` per the standing owner decision; the
+- Live-DB double-runs remain behind `DATAMIND_IT=1` per the standing owner decision; the
   CI adapter matrix (PG every push, ClickHouse labelled) is CI wiring — deferred to Phase 7
   with the rest of the workflow changes
 

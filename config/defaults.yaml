@@ -1,4 +1,4 @@
-# QueryPulse behavior configuration.
+# DataMind behavior configuration.
 #
 # This file is THE integration surface for your data: rename the columns
 # below to match your key-value telemetry table and the agent adapts.

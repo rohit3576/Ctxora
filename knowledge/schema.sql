@@ -1,4 +1,4 @@
--- QueryPulse knowledge store DDL (PostgreSQL).
+-- DataMind knowledge store DDL (PostgreSQL).
 -- The SQL knowledge base lives entirely in these tables; no markdown files.
 
 CREATE TABLE IF NOT EXISTS sql_agent_tenants (

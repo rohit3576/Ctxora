@@ -1,20 +1,20 @@
-# QueryPulse local stack.
+# DataMind local stack.
 # Default: metadata Postgres + API. ClickHouse joins with `--profile clickhouse`.
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: querypulse-postgres
+    container_name: datamind-postgres
     environment:
-      POSTGRES_USER: ${METADATA_DB_USER:-querypulse}
-      POSTGRES_PASSWORD: ${METADATA_DB_PASSWORD:-querypulse}
-      POSTGRES_DB: ${METADATA_DB_NAME:-querypulse}
+      POSTGRES_USER: ${METADATA_DB_USER:-datamind}
+      POSTGRES_PASSWORD: ${METADATA_DB_PASSWORD:-datamind}
+      POSTGRES_DB: ${METADATA_DB_NAME:-datamind}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${METADATA_DB_USER:-querypulse}"]
+      test: ["CMD-SHELL", "pg_isready -U ${METADATA_DB_USER:-datamind}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -22,7 +22,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
-    container_name: querypulse-clickhouse
+    container_name: datamind-clickhouse
     profiles: ["clickhouse"]
     ports:
       - "127.0.0.1:8123:8123"
@@ -33,7 +33,7 @@ services:
 
   api:
     build: .
-    container_name: querypulse-api
+    container_name: datamind-api
     environment:
       METADATA_DB_HOST: postgres
       TELEMETRY_DB_HOST: ${TELEMETRY_DB_HOST:-}

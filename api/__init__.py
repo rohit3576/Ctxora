@@ -1,1 +1,1 @@
-"""QueryPulse API surface."""
+"""DataMind API surface."""

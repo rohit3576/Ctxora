@@ -15,7 +15,7 @@ import jwt
 
 from config.settings import Settings
 
-_logger = logging.getLogger("querypulse.auth")
+_logger = logging.getLogger("datamind.auth")
 
 _DEV_WARNING: Final = "AUTH_DISABLED=true: request tenant accepted without verification (dev mode)"
 

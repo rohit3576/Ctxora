@@ -1,4 +1,4 @@
-# Contributing to QueryPulse
+# Contributing to DataMind
 
 ## Setup
 
