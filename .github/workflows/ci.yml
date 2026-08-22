@@ -26,6 +26,9 @@ jobs:
         run: |
           uv run ruff check
           uv run ruff format --check
+          # SQL files bypass ruff/pyright/pytest-fakes: guard the docstring-
+          # in-SQL bug class directly (psycopg sends file bytes verbatim).
+          ! grep -rn '"""' --include='*.sql' .
 
       - name: Type check
         # Gate is 0 errors; warnings are visible-by-design (failOnWarnings=false
@@ -71,6 +74,7 @@ jobs:
           python-version: "3.12"
       - run: uv sync --frozen
       - run: uv run python -c "from database.metadata import bootstrap_schema; from config.settings import get_settings; bootstrap_schema(get_settings())"
+      - run: DATAMIND_ADAPTER=postgres uv run python -m demo.seed_demo
       - run: DATAMIND_IT=1 uv run pytest tests/integration -k "not clickhouse"
 
   # ClickHouse-profile integration: opt-in via the 'clickhouse' PR label.

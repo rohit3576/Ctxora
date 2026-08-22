@@ -1,8 +1,6 @@
-"""Conversation memory DDL (PostgreSQL).
-
-supersedes_id ships now (Phase 2) and is consumed by the correction loop
-in Phase 3.
-"""
+-- Conversation memory DDL (PostgreSQL).
+-- supersedes_id ships now (Phase 2) and is consumed by the correction loop
+-- in Phase 3.
 
 CREATE TABLE IF NOT EXISTS llm_sessions (
     id UUID PRIMARY KEY,

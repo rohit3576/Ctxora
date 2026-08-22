@@ -18,8 +18,12 @@ from memory.contracts import (
 
 
 def _to_text(value: object) -> str:
-    """Narrow a cell to str (empty when not a str)."""
-    return value if isinstance(value, str) else ""
+    """Narrow a cell to str; UUID cells stringify (psycopg returns UUID objects)."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return ""
 
 
 def _to_int(value: object) -> int:

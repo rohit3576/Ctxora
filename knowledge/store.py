@@ -276,7 +276,7 @@ _EXAMPLES_SQL = f"""
     SELECT s.question, s.sql_query, s.intent, s.query_category, s.tables_used
     FROM sql_agent_sql_examples s
     {_TENANT_JOIN.format(col="s")}
-    WHERE s.status = 'approved'
+    AND s.status = 'approved'
     ORDER BY s.id
 """
 

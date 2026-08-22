@@ -28,14 +28,19 @@ def test_round_trip(tmp_path: object) -> None:
     """Ingest the manual, then retrieve its coolant chunk by cosine search."""
     from collections.abc import Sequence
 
+    dims = 1536  # must match rag_chunks.embedding VECTOR(1536)
+
     class DimEmbed:
-        """3-dim deterministic embedder matching the 1536-dim-free fake store."""
+        """Deterministic axis-unit embedder: coolant → axis 0, else axis 1."""
 
         def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
             return GenResult(sql="", raw="ok", prompt_tokens=1, completion_tokens=1)
 
         def embed(self, texts: Sequence[str]) -> list[list[float]]:
-            return [[1.0, 0.0, 0.0] if "coolant" in t.lower() else [0.0, 1.0, 0.0] for t in texts]
+            def vec(axis: int) -> list[float]:
+                return [1.0 if i == axis else 0.0 for i in range(dims)]
+
+            return [vec(0) if "coolant" in t.lower() else vec(1) for t in texts]
 
     store = PGRagStore(metadata_query(Settings()))
     record = ingest(

@@ -12,7 +12,8 @@ def metadata_query(settings: Settings) -> Query:
         statement = sql.encode("utf-8")
         with MetadataConnection(settings) as conn, conn.cursor() as cur:
             cur.execute(statement, params)
-            rows = cur.fetchall()
+            # None for INSERT/UPDATE/DELETE: writes produce no result set.
+            rows = cur.fetchall() if cur.description is not None else []
         return [tuple(row) for row in rows]
 
     return query
