@@ -6,7 +6,7 @@ Two layers, loaded once at startup, both validated fail-fast:
 - ``AppConfig`` (frozen Pydantic models) — behavior from ``defaults.yaml``:
   column mapping, agent defaults, flags, routing indicators.
 
-A user pointing DataMind at their own key-value database changes only
+A user pointing Ctxora at their own key-value database changes only
 these two sources. If a use case forces editing Python, that is a design bug.
 """
 
@@ -39,14 +39,14 @@ class Settings(BaseSettings):
     # Metadata store (sessions, history, knowledge, feedback, vectors)
     metadata_db_host: str = "localhost"
     metadata_db_port: int = 5432
-    metadata_db_name: str = "datamind"
-    metadata_db_user: str = "datamind"
+    metadata_db_name: str = "ctxora"
+    metadata_db_user: str = "ctxora"
     metadata_db_password: str = ""
 
     # Telemetry store (engine depends on YAML stores.telemetry.adapter)
     telemetry_db_host: str | None = None
     telemetry_db_port: int = 8123
-    telemetry_db_name: str = "datamind"
+    telemetry_db_name: str = "ctxora"
     telemetry_db_user: str | None = None
     telemetry_db_password: str | None = None
 

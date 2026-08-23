@@ -1,8 +1,8 @@
-# DataMind — Repository Architecture & Build Plan
+# Ctxora — Repository Architecture & Build Plan
 
 > **Companion doc:** [`../blueprint/IMPLEMENTATION_BLUEPRINT.md`](../blueprint/IMPLEMENTATION_BLUEPRINT.md) is the *specification* (what the system does, stage-by-stage pipeline, schemas, safety rules). **This doc is the builder's guide**: repo layout, module contracts, the backend-agnostic adapter design, and a phase-by-phase implementation plan with copy-vs-rewrite guidance.
 
-**Design constraint #1, stated up front:** DataMind is **not a ClickHouse tool**. It is a natural-language query engine for **any key-value telemetry store**. ClickHouse is the first adapter; PostgreSQL (and TimescaleDB) are first-class peers. Every engine-specific detail lives behind two interfaces (`Dialect` + `TelemetryStore`, §4) — the agent core never imports an engine client directly.
+**Design constraint #1, stated up front:** Ctxora is **not a ClickHouse tool**. It is a natural-language query engine for **any key-value telemetry store**. ClickHouse is the first adapter; PostgreSQL (and TimescaleDB) are first-class peers. Every engine-specific detail lives behind two interfaces (`Dialect` + `TelemetryStore`, §4) — the agent core never imports an engine client directly.
 
 ---
 
@@ -16,7 +16,7 @@
 6. [Data Contracts](#6-data-contracts)
 7. [Dialect Portability Matrix](#7-dialect-portability-matrix)
 8. [Phase Plan (v0.1 → v1.0)](#8-phase-plan-v01--v10)
-9. [Copy Map: Company Repo → DataMind](#9-copy-map-company-repo--datamind)
+9. [Copy Map: Company Repo → Ctxora](#9-copy-map-company-repo--ctxora)
 10. [Testing Layout](#10-testing-layout)
 11. [Dependencies](#11-dependencies)
 12. [Conventions & Guardrails](#12-conventions--guardrails)
@@ -96,7 +96,7 @@
 ## 3. Repository Layout
 
 ```text
-datamind/
+ctxora/
 ├── main.py                        # app factory, router registration, startup
 ├── api/
 │   ├── query.py                   # POST /v1/query, /v1/query/sql[/stream]
@@ -296,7 +296,7 @@ Two layers, loaded once at startup, validated fail-fast (no silent defaults for 
 1. **Environment** — credentials & deployment knobs (`.env.example` documents every key; see blueprint §15).
 2. **`config/defaults.yaml`** — behavior: flags, router indicator lists, column mapping, per-key aggregation defaults.
 
-**The file that makes DataMind "anyone with KV data":**
+**The file that makes Ctxora "anyone with KV data":**
 
 ```yaml
 stores:
@@ -438,14 +438,14 @@ Each phase: **scope · deliverables · acceptance demo**. Nothing later than its
 
 ---
 
-## 9. Copy Map: Production Reference → DataMind
+## 9. Copy Map: Production Reference → Ctxora
 
 > The detailed file-by-file reference (which production module informs which
-> DataMind module, plus the do-not-copy list) lives in
+> Ctxora module, plus the do-not-copy list) lives in
 > `docs/internal/REBUILD_NOTES.md` — **internal, gitignored, never published**.
 > Rebuild against YOUR production implementation; strip every identifier.
 
-| DataMind module | Action |
+| Ctxora module | Action |
 |---|---|
 | `agent/validator.py`, `knowledge/store.py`, `agent/prompt_builder.py` | rewrite-from-reference (keep the mechanisms: rule engine, cache, section layout) |
 | `agent/key_resolver.py`, `generator.py`, `memory/*`, `feedback/*` | adapt: same flow, generic vocabulary, config-driven lists |
@@ -516,7 +516,7 @@ pytest-asyncio
 ruff
 ```
 
-Keep `clickhouse-connect` an optional extra (`pip install datamind[clickhouse]`) — a Postgres-only user shouldn't carry it.
+Keep `clickhouse-connect` an optional extra (`pip install ctxora[clickhouse]`) — a Postgres-only user shouldn't carry it.
 
 ---
 

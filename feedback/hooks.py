@@ -7,7 +7,7 @@ from agent.pipeline import QuerySuccess
 from feedback.contracts import FeedbackInsert, FeedbackStore
 from knowledge.store import KnowledgeStore
 
-_logger = logging.getLogger("datamind.feedback_hooks")
+_logger = logging.getLogger("ctxora.feedback_hooks")
 
 
 def normalize_sql(sql: str) -> str:

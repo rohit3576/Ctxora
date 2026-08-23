@@ -13,7 +13,7 @@ uv run python -m demo.seed_demo          # metadata + telemetry
 uv run uvicorn main:app --port 8000
 ```
 
-Postgres-only demo: `DATAMIND_ADAPTER=postgres uv run python -m demo.seed_demo`
+Postgres-only demo: `CTXORA_ADAPTER=postgres uv run python -m demo.seed_demo`
 and set `adapter: postgres` in `config/defaults.yaml`.
 
 ## Script

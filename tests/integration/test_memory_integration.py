@@ -1,6 +1,6 @@
 """Integration: sessions/history round-trip + probe on live compose services.
 
-Run explicitly: DATAMIND_IT=1 uv run pytest tests/integration
+Run explicitly: CTXORA_IT=1 uv run pytest tests/integration
 Requires: docker compose up -d, then uv run python -m demo.seed_demo.
 """
 
@@ -19,8 +19,8 @@ from onboarding.state import OnboardingStateStore
 from tests.fakes import FakeLLM
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DATAMIND_IT") != "1",
-    reason="integration tests run only with DATAMIND_IT=1",
+    os.environ.get("CTXORA_IT") != "1",
+    reason="integration tests run only with CTXORA_IT=1",
 )
 
 

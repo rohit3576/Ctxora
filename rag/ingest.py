@@ -9,7 +9,7 @@ from rag.chunker import chunk_pages
 from rag.contracts import ChunkInsert, DocumentRecord, RagStore
 from rag.parsers import UnsupportedFormatError, parse, supported
 
-_logger = logging.getLogger("datamind.ingest")
+_logger = logging.getLogger("ctxora.ingest")
 
 
 class IngestError(Exception):

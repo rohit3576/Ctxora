@@ -1,12 +1,12 @@
-# DataMind
+# Ctxora
 
-**An open-source AI platform for reasoning over knowledge, databases, and real-time data.**
+**The open-source semantic query layer for IoT telemetry.**
 
 Point it at any key-value telemetry database (`timestamp + entity + key + value`), and your users can ask:
 
 > "What was the average RPM of truck-102 yesterday?"
 
-…in plain English. DataMind resolves the right keys from your registry, generates validated **read-only** SQL for your engine (ClickHouse and PostgreSQL/Timescale are tested peers), executes it safely, and explains the result — with conversation memory, a correction loop, a human-reviewed feedback flywheel, and document RAG with cited sources.
+…in plain English. Ctxora resolves the right keys from your registry, generates validated **read-only** SQL for your engine (ClickHouse and PostgreSQL/Timescale are tested peers), executes it safely, and explains the result — with conversation memory, a correction loop, a human-reviewed feedback flywheel, and document RAG with cited sources.
 
 ```text
 User question → auth + rate limit → intent routing ─┬→ SQL agent: key resolution (RAG over your registry)

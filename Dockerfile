@@ -1,4 +1,4 @@
-# DataMind API image: slim, non-root, uv-managed deps.
+# Ctxora API image: slim, non-root, uv-managed deps.
 
 FROM python:3.11-slim AS builder
 
@@ -16,12 +16,12 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.11-slim
 
-RUN groupadd --system datamind && useradd --system --gid datamind datamind
+RUN groupadd --system ctxora && useradd --system --gid ctxora ctxora
 
 WORKDIR /app
 COPY --from=builder /app /app
 
-USER datamind
+USER ctxora
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

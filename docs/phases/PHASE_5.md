@@ -57,7 +57,7 @@ advisor mode.
   10-field shape, **RAG outage → typed 503, hybrid degrades to SQL-only** (regression after
   live-boot catch)
 - Integration (`tests/integration/test_rag_integration.py`): pgvector ingest→retrieve→delete
-  round-trip behind `DATAMIND_IT=1` (per standing owner decision on local infra runs)
+  round-trip behind `CTXORA_IT=1` (per standing owner decision on local infra runs)
 - Live boot (uvicorn, PG down): `/v1/rag/query` → typed `503 RAG_STORE_UNAVAILABLE` envelope;
   `/v1/query` data route → typed `503 PIPELINE_UNAVAILABLE`
 

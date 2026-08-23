@@ -1,6 +1,6 @@
 """Core storage contracts.
 
-These protocols are the load-bearing walls of DataMind (architecture doc
+These protocols are the load-bearing walls of Ctxora (architecture doc
 section 4): the agent core imports these, never a concrete engine client.
 Adding a storage engine = one file in database/dialects/ + one store file.
 """

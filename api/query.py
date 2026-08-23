@@ -34,7 +34,7 @@ from rag.contracts import RagStore
 from rag.rag_flow import UngroundedError, answer_grounded, retrieve
 from routing.router import RouteDecision, classify
 
-_logger = logging.getLogger("datamind.query")
+_logger = logging.getLogger("ctxora.query")
 
 _ROW_TYPE = dict[str, float | int | str | bool | None]
 _HTTP_OK = 200

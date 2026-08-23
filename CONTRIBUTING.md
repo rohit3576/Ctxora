@@ -1,4 +1,4 @@
-# Contributing to DataMind
+# Contributing to Ctxora
 
 ## Setup
 

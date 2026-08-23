@@ -1,4 +1,4 @@
--- DataMind knowledge store DDL (PostgreSQL).
+-- Ctxora knowledge store DDL (PostgreSQL).
 -- The SQL knowledge base lives entirely in these tables; no markdown files.
 
 CREATE TABLE IF NOT EXISTS sql_agent_tenants (

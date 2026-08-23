@@ -1,6 +1,6 @@
 # Security Notes
 
-DataMind executes LLM-generated SQL against your telemetry store. The
+Ctxora executes LLM-generated SQL against your telemetry store. The
 safety model is layered:
 
 ## SQL safety

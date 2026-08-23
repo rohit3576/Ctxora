@@ -397,7 +397,7 @@ wheels = [
 ]
 
 [[package]]
-name = "datamind"
+name = "ctxora"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

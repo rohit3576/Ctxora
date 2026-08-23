@@ -15,7 +15,7 @@ from rag.contracts import DocumentRecord, RagStore
 from rag.ingest import IngestError, ingest
 from rag.parsers import UnsupportedFormatError
 
-_logger = logging.getLogger("datamind.documents")
+_logger = logging.getLogger("ctxora.documents")
 
 IngestFn = Callable[[str, str, bytes], DocumentRecord]
 

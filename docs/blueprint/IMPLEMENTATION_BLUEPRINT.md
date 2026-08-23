@@ -1,13 +1,13 @@
-# DataMind
+# Ctxora
 
 **An open-source Agentic NL→SQL + RAG engine for high-cardinality telemetry and time-series data.**
 
-> Ask plain-English questions about IoT / fleet / industrial / sensor data stored as key-value telemetry — DataMind finds the right keys, generates safe SQL, validates it, runs it, and explains the result.
+> Ask plain-English questions about IoT / fleet / industrial / sensor data stored as key-value telemetry — Ctxora finds the right keys, generates safe SQL, validates it, runs it, and explains the result.
 
 ```text
 "What was the average RPM of truck 102 yesterday?"
                 ↓
-   DataMind agent pipeline
+   Ctxora agent pipeline
                 ↓
 "The average RPM of truck 102 yesterday was 1,487."
 ```
@@ -18,7 +18,7 @@ This document is the **complete implementation blueprint**. It describes every c
 
 ## Table of Contents
 
-1. [Why DataMind Exists](#1-why-datamind-exists)
+1. [Why Ctxora Exists](#1-why-ctxora-exists)
 2. [Positioning & Audience](#2-positioning--audience)
 3. [System Architecture](#3-system-architecture)
 4. [Data Model](#4-data-model)
@@ -43,7 +43,7 @@ This document is the **complete implementation blueprint**. It describes every c
 
 ---
 
-## 1. Why DataMind Exists
+## 1. Why Ctxora Exists
 
 Telemetry, IoT, fleet, and observability systems converge on a hard problem:
 
@@ -59,7 +59,7 @@ Generic text-to-SQL tools fail here because they don't understand:
 - **Analytical-engine dialects** — ClickHouse-style functions (`toFloat64OrNull`, `argMax`, `JSONExtract*`), memory-bounded aggregations, MergeTree ordering.
 - **Conversational context** — "what about truck 102?" following "average speed of the fleet yesterday?".
 
-DataMind is a purpose-built agent stack that solves exactly this: **natural-language querying over arbitrary key-value telemetry**, with schema-aware retrieval (RAG over your own keys/rules/examples), validated read-only SQL generation, and a feedback loop that gets better with use.
+Ctxora is a purpose-built agent stack that solves exactly this: **natural-language querying over arbitrary key-value telemetry**, with schema-aware retrieval (RAG over your own keys/rules/examples), validated read-only SQL generation, and a feedback loop that gets better with use.
 
 ```text
 timestamp           key                 value
@@ -72,7 +72,7 @@ timestamp           key                 value
 
 ## 2. Positioning & Audience
 
-**Not** "another RAG chatbot." DataMind's core problem statement:
+**Not** "another RAG chatbot." Ctxora's core problem statement:
 
 > *Let users ask natural-language questions against arbitrary, high-cardinality telemetry / key-value data without knowing the schema, the key names, or SQL.*
 
@@ -876,15 +876,15 @@ Graceful states: clarifying question (200 + question, no SQL), validation failur
 # ── Analytical engine (telemetry) ────────────────────────────
 TELEMETRY_DB_HOST=localhost
 TELEMETRY_DB_PORT=8123
-TELEMETRY_DB_NAME=datamind
+TELEMETRY_DB_NAME=ctxora
 TELEMETRY_DB_USER=readonly_user
 TELEMETRY_DB_PASSWORD=changeme
 
 # ── Metadata store (sessions/history/feedback/registry) ─────
 METADATA_DB_HOST=localhost
 METADATA_DB_PORT=5432
-METADATA_DB_NAME=datamind_meta
-METADATA_DB_USER=datamind
+METADATA_DB_NAME=ctxora_meta
+METADATA_DB_USER=ctxora
 METADATA_DB_PASSWORD=changeme
 
 # ── LLM (any OpenAI-compatible endpoint) ────────────────────
@@ -936,12 +936,12 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: datamind
+      POSTGRES_USER: ctxora
       POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: datamind_meta
+      POSTGRES_DB: ctxora_meta
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U datamind"]
+      test: ["CMD-SHELL", "pg_isready -U ctxora"]
       interval: 10s
       retries: 10
 
@@ -993,7 +993,7 @@ The golden-eval export (§12) is the connective tissue: real approved question�
 ## 20. Project Structure (Target Repo Layout)
 
 ```text
-datamind/
+ctxora/
 ├── api/                      # FastAPI app, routers, SSE
 ├── agent/
 │   ├── pipeline.py           # S0–S13 orchestration
@@ -1072,8 +1072,8 @@ If you (or anyone) rebuild this from a production codebase, **sanitize first**:
 - [ ] Onboarding wizard (§13)
 - [ ] Stage latency + token accounting (§18)
 
-**Portfolio positioning:** *"DataMind — an open-source agentic NL→SQL + RAG engine for high-cardinality telemetry. Schema-aware key retrieval, validated read-only SQL generation over an EAV telemetry model, conversation memory with correction repair, and a human-in-the-loop feedback flywheel."* Demonstrate with a seeded `demo` tenant: ask questions in plain English, watch keys resolve, SQL generate/validate/execute, answers stream — then show the flywheel promoting a real correction into a few-shot example.
+**Portfolio positioning:** *"Ctxora — an open-source agentic NL→SQL + RAG engine for high-cardinality telemetry. Schema-aware key retrieval, validated read-only SQL generation over an EAV telemetry model, conversation memory with correction repair, and a human-in-the-loop feedback flywheel."* Demonstrate with a seeded `demo` tenant: ask questions in plain English, watch keys resolve, SQL generate/validate/execute, answers stream — then show the flywheel promoting a real correction into a few-shot example.
 
 ---
 
-*DataMind blueprint · company-agnostic by construction · CC-BY-4.0 when published*
+*Ctxora blueprint · company-agnostic by construction · CC-BY-4.0 when published*

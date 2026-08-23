@@ -19,7 +19,7 @@ from onboarding.wizard import (
     suggest_name,
 )
 
-_logger = logging.getLogger("datamind.onboarding")
+_logger = logging.getLogger("ctxora.onboarding")
 
 
 class KeyView(BaseModel):

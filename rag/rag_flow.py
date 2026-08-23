@@ -10,7 +10,7 @@ from config.settings import RagConfig
 from llm.client import LLMClient
 from rag.contracts import RagStore, RetrievedChunk
 
-_logger = logging.getLogger("datamind.rag")
+_logger = logging.getLogger("ctxora.rag")
 
 _ADVICE_ADAPTER: Final = TypeAdapter(dict[str, object])
 _ANSWER_SYSTEM = (

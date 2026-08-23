@@ -104,4 +104,4 @@ class TestSettingsEnvMapping:
         settings = Settings()
 
         assert settings.metadata_db_host == "localhost"
-        assert settings.metadata_db_name == "datamind"
+        assert settings.metadata_db_name == "ctxora"

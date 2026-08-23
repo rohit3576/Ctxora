@@ -1,7 +1,7 @@
 [project]
-name = "datamind"
+name = "ctxora"
 version = "0.1.0"
-description = "AI platform for reasoning over knowledge, databases, and real-time data"
+description = "Open-source semantic query layer for IoT telemetry"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Rohitashok Pawar" }]
@@ -303,7 +303,7 @@ docstring-code-line-length = "dynamic"
 minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["integration: requires live compose services (DATAMIND_IT=1)"]
+markers = ["integration: requires live compose services (CTXORA_IT=1)"]
 addopts = ["-ra", "--strict-config", "--strict-markers"]
 filterwarnings = ["error"]
 

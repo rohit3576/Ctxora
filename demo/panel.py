@@ -13,8 +13,8 @@ import streamlit as st
 QUERY_URL = os.environ.get("QUERY_URL", "http://localhost:8000")
 TENANT = os.environ.get("TENANT", "demo")
 
-st.set_page_config(page_title="DataMind", page_icon="📊", layout="centered")
-st.title("DataMind")
+st.set_page_config(page_title="Ctxora", page_icon="📊", layout="centered")
+st.title("Ctxora")
 st.caption(f"NL → SQL over telemetry · tenant `{TENANT}` · API `{QUERY_URL}`")
 
 tab_chat, tab_docs, tab_wizard = st.tabs(["Chat", "Documents", "Onboarding"])

@@ -1,6 +1,6 @@
 """Integration: document ingest→retrieve round-trip on live PG + pgvector.
 
-Run explicitly: DATAMIND_IT=1 uv run pytest tests/integration
+Run explicitly: CTXORA_IT=1 uv run pytest tests/integration
 Requires: docker compose up -d (pgvector image).
 """
 
@@ -17,8 +17,8 @@ from rag.store import PGRagStore
 from tests.test_rag_core import MANUAL
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("DATAMIND_IT") != "1",
-    reason="integration tests run only with DATAMIND_IT=1",
+    os.environ.get("CTXORA_IT") != "1",
+    reason="integration tests run only with CTXORA_IT=1",
 )
 
 _TENANT = "rag-it"

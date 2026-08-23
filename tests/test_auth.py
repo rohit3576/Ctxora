@@ -27,7 +27,7 @@ class TestDevMode:
     def test_request_tenant_stands_and_warns_once(self, caplog: pytest.LogCaptureFixture) -> None:
         auth = TenantAuth(Settings(auth_disabled=True))
 
-        with caplog.at_level(logging.WARNING, logger="datamind.auth"):
+        with caplog.at_level(logging.WARNING, logger="ctxora.auth"):
             first = auth.resolve("demo")
             second = auth.resolve("demo")
 

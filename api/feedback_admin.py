@@ -14,7 +14,7 @@ from feedback.contracts import FeedbackStore
 from feedback.promotion import approve, auto_promote_positive, reject
 from llm.client import LLMClient
 
-_logger = logging.getLogger("datamind.feedback_admin")
+_logger = logging.getLogger("ctxora.feedback_admin")
 
 
 class ReviewAction(BaseModel):

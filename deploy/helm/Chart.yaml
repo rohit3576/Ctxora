@@ -1,6 +1,6 @@
 apiVersion: v2
-name: datamind
-description: AI platform for reasoning over knowledge, databases, and real-time data
+name: ctxora
+description: Open-source semantic query layer for IoT telemetry
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

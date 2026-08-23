@@ -34,7 +34,7 @@ feedback flywheel (4) · document RAG + routing (5) · Postgres adapter + semant
 | Pipeline | `agent/pipeline.py` | S5→S13 wiring; outcome union: Success / Rejected / ExecutionFailed |
 | API | `api/query.py` | POST `/v1/query/sql`; envelope; typed error mapping |
 | Demo | `demo/seed_demo.py`, `demo/questions.md` | deterministic synthetic fleet (3 trucks × 5 keys × 24h), knowledge seed, acceptance script |
-| Tests | `tests/test_*.py`, `tests/integration/` | unit (fakes) + fake-based e2e + live integration (skip-marked, `DATAMIND_IT=1`) |
+| Tests | `tests/test_*.py`, `tests/integration/` | unit (fakes) + fake-based e2e + live integration (skip-marked, `CTXORA_IT=1`) |
 
 ## Contracts & flags touched
 
@@ -50,7 +50,7 @@ Config: `agent.row_cap`, `agent.query_timeout_s`, `stores.telemetry.mapping` dri
 - [x] `pytest` green — **98 passed, 5 integration skipped** (final run)
 - [x] `ruff check` + `ruff format --check` clean (one ISC004 violation found and fixed during re-verification)
 - [x] **`basedpyright` 0 errors** — cleanup completed (130 → 0; final: 0 errors, 50 warnings)
-- [~] Integration run vs live compose — **skipped by owner decision** ("no need for this"); instructions preserved in `demo/questions.md`; tests remain in `tests/integration/` behind `DATAMIND_IT=1`
+- [~] Integration run vs live compose — **skipped by owner decision** ("no need for this"); instructions preserved in `demo/questions.md`; tests remain in `tests/integration/` behind `CTXORA_IT=1`
 - [~] Live LLM demo — **skipped by owner decision** (needs Docker + `LLM_API_KEY`); script preserved in `demo/questions.md`
 - [x] Supporting evidence recorded (leak scan clean; README + phases index updated)
 
