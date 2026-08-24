@@ -1,6 +1,6 @@
 # Ctxora — Repository Architecture & Build Plan
 
-> **Companion doc:** [`../blueprint/IMPLEMENTATION_BLUEPRINT.md`](../blueprint/IMPLEMENTATION_BLUEPRINT.md) is the *specification* (what the system does, stage-by-stage pipeline, schemas, safety rules). **This doc is the builder's guide**: repo layout, module contracts, the backend-agnostic adapter design, and a phase-by-phase implementation plan with copy-vs-rewrite guidance.
+> **Companion docs:** [`../blueprint/IMPLEMENTATION_BLUEPRINT.md`](../blueprint/IMPLEMENTATION_BLUEPRINT.md) is the *specification* (what the system does, stage-by-stage pipeline, schemas, safety rules). [`DIAGRAMS.md`](DIAGRAMS.md) is the visual atlas (context, request flow, security gauntlet, flywheel, deployment). [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) is the design rationale (principles, trade-offs, mini-ADRs). **This doc is the builder's guide**: repo layout, module contracts, the backend-agnostic adapter design, and a phase-by-phase implementation plan with copy-vs-rewrite guidance.
 
 **Design constraint #1, stated up front:** Ctxora is **not a ClickHouse tool**. It is a natural-language query engine for **any key-value telemetry store**. ClickHouse is the first adapter; PostgreSQL (and TimescaleDB) are first-class peers. Every engine-specific detail lives behind two interfaces (`Dialect` + `TelemetryStore`, §4) — the agent core never imports an engine client directly.
 

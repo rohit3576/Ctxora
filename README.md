@@ -29,7 +29,7 @@ Memory: sessions, history, correction lineage · Flywheel: capture → review �
 | 6 | PostgreSQL/Timescale adapter + semantic examples | ✅ |
 | 7 | v1.0: auth, rate limiting, onboarding wizard, demo panel, Helm, CI | ✅ |
 
-Spec: [`docs/blueprint/IMPLEMENTATION_BLUEPRINT.md`](docs/blueprint/IMPLEMENTATION_BLUEPRINT.md) · architecture: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) · phase logs: [`docs/phases/`](docs/phases/)
+Spec: [`docs/blueprint/IMPLEMENTATION_BLUEPRINT.md`](docs/blueprint/IMPLEMENTATION_BLUEPRINT.md) · architecture: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) · diagrams: [`docs/architecture/DIAGRAMS.md`](docs/architecture/DIAGRAMS.md) · system design: [`docs/architecture/SYSTEM_DESIGN.md`](docs/architecture/SYSTEM_DESIGN.md) · phase logs: [`docs/phases/`](docs/phases/)
 
 ## Quickstart
 
@@ -84,7 +84,7 @@ every question against **both** storage engines.
 ## Resources
 
 - Spec: [`docs/blueprint/IMPLEMENTATION_BLUEPRINT.md`](docs/blueprint/IMPLEMENTATION_BLUEPRINT.md)
-- Architecture: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md)
+- Architecture: [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) · Diagrams: [`docs/architecture/DIAGRAMS.md`](docs/architecture/DIAGRAMS.md) · System design: [`docs/architecture/SYSTEM_DESIGN.md`](docs/architecture/SYSTEM_DESIGN.md)
 - Phase logs: [`docs/phases/`](docs/phases/)
 - Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) · Security: [`SECURITY.md`](SECURITY.md)
 - API reference: run the server and open `/docs` (OpenAPI UI)
