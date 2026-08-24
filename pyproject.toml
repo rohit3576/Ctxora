@@ -94,10 +94,16 @@ reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
 
-# agent/validator.py: sqlglot's parse ships **opts typed as Unknown; the
-# validator passes only (sql, read=) and narrows the result immediately.
+# agent/validator.py + feedback/hooks.py: sqlglot's parse/parse_one ship
+# **opts typed as Unknown; both call sites pass narrow kwargs and use the
+# result immediately.
 [[tool.basedpyright.executionEnvironments]]
 root = "agent"
+extraPaths = ["."]
+reportUnknownMemberType = "none"
+
+[[tool.basedpyright.executionEnvironments]]
+root = "feedback"
 extraPaths = ["."]
 reportUnknownMemberType = "none"
 

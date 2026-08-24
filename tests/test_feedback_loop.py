@@ -6,6 +6,9 @@ from dataclasses import replace
 import pytest
 
 from agent.pipeline import QuerySuccess
+from agent.validator import SQLValidator
+from config.settings import ColumnMapping
+from database.dialects.clickhouse import ClickHouseDialect
 from feedback.capture import HistoryNotFoundError, capture
 from feedback.contracts import FeedbackInsert, FeedbackStore
 from feedback.fake import InMemoryFeedbackStore
@@ -71,6 +74,69 @@ class TestNormalizeSql:
 
     def test_different_sql_differs(self) -> None:
         assert normalize_sql("SELECT 1") != normalize_sql("SELECT 2")
+
+    @pytest.mark.parametrize(
+        "sql",
+        [
+            "SELECT  avg(value)\nFROM demo_telemetry",
+            "select avg(value) from demo_telemetry",
+            "SELECT AVG(value)   FROM demo_telemetry",
+        ],
+    )
+    def test_variants_collapse_to_one_canonical_form(self, sql: str) -> None:
+        canonical = normalize_sql(sql)
+
+        assert canonical == normalize_sql("select avg(value) from demo_telemetry")
+
+    @pytest.mark.parametrize(
+        ("sql", "bare"),
+        [
+            ("SELECT 1 -- c", "SELECT 1"),
+            ("SELECT 1 /* c */", "SELECT 1"),
+        ],
+    )
+    def test_comment_variants_collapse(self, sql: str, bare: str) -> None:
+        assert normalize_sql(sql) == normalize_sql(bare)
+
+    @pytest.mark.parametrize(
+        ("garbage", "legacy"),
+        [
+            ("NOT SQL AT ALL", "not sql at all"),
+            ("SELECT 'unterminated", "select 'unterminated"),
+        ],
+    )
+    def test_unparseable_input_falls_back_without_raising(self, garbage: str, legacy: str) -> None:
+        # ParseError path first; TokenError (tokenizer) second — generic
+        # dialect empirically raises both (probed 2026-08-24, sqlglot 27.29.0).
+        assert normalize_sql(garbage) == legacy
+
+    def test_garbage_that_parses_canonicalizes_deterministically(self) -> None:
+        # 'NOT SQL $$$' parses under the GENERIC dialect (postgres TokenErrors
+        # on it — generic does not); output is garbage but deterministic, which
+        # is all dedupe requires. Documents the divergence from Phase 3 lock (b).
+        assert normalize_sql("NOT SQL $$$") == normalize_sql("NOT SQL $$$")
+
+    def test_ch_idiom_normalization_is_deterministic(self) -> None:
+        sql = "SELECT argMax(value, timestamp) FROM demo_telemetry"
+
+        assert normalize_sql(sql) == normalize_sql(sql)
+
+    def test_validator_normalized_sql_stays_the_repaired_string(self) -> None:
+        repaired = "SELECT avg(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'speed'"
+
+        result = SQLValidator(
+            ClickHouseDialect(),
+            ColumnMapping(
+                table="demo_telemetry",
+                timestamp="timestamp",
+                entity_id="device_id",
+                key="key",
+                value="value",
+            ),
+            ("demo_telemetry",),
+        ).validate("SELECT avg(value) FROM demo_telemetry WHERE key = 'speed'")
+
+        assert result.normalized_sql == repaired
 
 
 class TestMining:
