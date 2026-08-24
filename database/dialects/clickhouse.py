@@ -1,30 +1,6 @@
 """ClickHouse dialect: every engine-specific SQL expression in one place."""
 
-from typing import Final
-
 from config.settings import ColumnMapping
-
-_FORBIDDEN_VERBS: Final = (
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "DROP",
-    "ALTER",
-    "TRUNCATE",
-    "CREATE",
-    "ATTACH",
-    "DETACH",
-    "SYSTEM",
-    "SHOW",
-    "DESCRIBE",
-    "RENAME",
-    "OPTIMIZE",
-    "GRANT",
-    "REVOKE",
-    "KILL",
-    "FLUSH",
-    "EXCHANGE",
-)
 
 
 class ClickHouseDialect:
@@ -63,10 +39,6 @@ class ClickHouseDialect:
     def quote_ident(self, name: str) -> str:
         """Quote an identifier with backticks."""
         return f"`{name}`"
-
-    def readonly_violation_patterns(self) -> tuple[str, ...]:
-        """Word-boundary regexes for forbidden statements, incl. CH admin verbs."""
-        return tuple(rf"\b{verb}\b" for verb in _FORBIDDEN_VERBS)
 
     def eav_system_rules(self, mapping: ColumnMapping) -> str:
         """Render the dialect-specific EAV rules block for the system prompt."""

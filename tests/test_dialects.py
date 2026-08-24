@@ -6,6 +6,7 @@ golden string here without changing that matrix is a contract violation.
 
 import pytest
 
+from agent.validator import SQLValidator
 from config.settings import DEFAULT_CONFIG_PATH, ColumnMapping, load_app_config
 from database.dialects.clickhouse import ClickHouseDialect
 from database.dialects.postgres import PostgresDialect
@@ -48,11 +49,11 @@ class TestClickHouseDialect:
     def test_quote_ident_uses_backticks(self) -> None:
         assert ClickHouseDialect().quote_ident("my_table") == "`my_table`"
 
-    def test_readonly_patterns_block_engine_admin_verbs(self) -> None:
-        patterns = " ".join(ClickHouseDialect().readonly_violation_patterns()).upper()
+    def test_admin_statements_rejected_by_validator(self, mapping: ColumnMapping) -> None:
+        validator = SQLValidator(ClickHouseDialect(), mapping, ("demo_telemetry",))
 
-        for verb in ("DROP", "OPTIMIZE", "KILL", "SYSTEM"):
-            assert verb in patterns
+        for statement in ("OPTIMIZE TABLE demo_telemetry", "KILL QUERY 1", "SYSTEM FLUSH LOGS"):
+            assert validator.validate(statement).valid is False
 
     def test_eav_rules_use_mapped_columns(self, mapping: ColumnMapping) -> None:
         rules = ClickHouseDialect().eav_system_rules(mapping)
@@ -93,11 +94,15 @@ class TestPostgresDialect:
     def test_quote_ident_uses_double_quotes(self) -> None:
         assert PostgresDialect().quote_ident("my_table") == '"my_table"'
 
-    def test_readonly_patterns_block_engine_admin_verbs(self) -> None:
-        patterns = " ".join(PostgresDialect().readonly_violation_patterns()).upper()
+    def test_admin_statements_rejected_by_validator(self, mapping: ColumnMapping) -> None:
+        validator = SQLValidator(PostgresDialect(), mapping, ("demo_telemetry",))
 
-        for verb in ("DROP", "VACUUM", "COPY", "REINDEX"):
-            assert verb in patterns
+        for statement in (
+            "VACUUM demo_telemetry",
+            "REINDEX demo_telemetry",
+            "COPY demo_telemetry TO '/tmp/x'",
+        ):
+            assert validator.validate(statement).valid is False
 
     def test_eav_rules_use_mapped_columns(self, mapping: ColumnMapping) -> None:
         rules = PostgresDialect().eav_system_rules(mapping)

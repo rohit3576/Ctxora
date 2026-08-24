@@ -221,9 +221,9 @@ class Dialect(Protocol):
 
     def now_minus(self, unit: str, n: int) -> str: ...
     def quote_ident(self, name: str) -> str: ...
-    def readonly_violation_patterns(self) -> list[str]:
-        """Forbidden-statement regexes, engine-flavored (includes engine
-        admin verbs e.g. OPTIMIZE/KILL for clickhouse, VACUUM for pg)."""
+    @property
+    def sqlglot_name(self) -> str:
+        """sqlglot dialect identifier for AST parsing ("clickhouse"/"postgres")."""
 
     def eav_system_rules(self, mapping: ColumnMapping) -> str:
         """Renders the dialect-specific EAV rules block injected into the
@@ -374,12 +374,12 @@ Everything the agent knows about an engine, in one table (this is what `Dialect`
 | JSON field | `JSONExtractFloat(payload,'lat')` | `(payload::jsonb->>'lat')::double precision` |
 | Time bucket | `toStartOfInterval(ts, INTERVAL 1 HOUR)` | `date_trunc('hour', ts)` / `time_bucket('1 hour', ts)` |
 | Now minus | `now() - INTERVAL 1 DAY` | `now() - INTERVAL '1 day'` |
-| Forbidden verbs (beyond SQL standard) | `OPTIMIZE, KILL, SYSTEM, ATTACH, DETACH, FLUSH` | `VACUUM, ANALYZE, REINDEX, CLUSTER, CALL, DO, COPY` |
+| Read-only statement gate | AST root allowlist (sqlglot) — identical for both engines | AST root allowlist (sqlglot) — identical for both engines |
 | Read-only enforcement | read-only user + settings | read-only role + `default_transaction_read_only` |
 | Memory guard | `max_bytes_before_external_*` | `statement_timeout`, `work_mem` discipline |
 | KV table shape | MergeTree, `ORDER BY (entity, key, ts)` | plain table / Timescale hypertable + `(entity, key, ts)` index |
 
-The validator's *generic* rules (read-only, table allowlist, CTE depth, GROUP BY presence, value-cast presence) are engine-neutral; the dialect only supplies patterns and rendering. **Adding a third engine = one file in `database/dialects/` + one in `database/`** (e.g., DuckDB for single-file demos).
+The validator's *generic* rules are engine-neutral and structural: it parses each statement with the dialect's sqlglot grammar, allows only SELECT-shaped roots, denies mutation/lock nodes anywhere in the tree, enforces the table allowlist (unqualified names only), and caps CTE depth; the dialect only supplies rendering (`sqlglot_name` picks the parse grammar). **Adding a third engine = one file in `database/dialects/` + one in `database/`** (e.g., DuckDB for single-file demos).
 
 ---
 

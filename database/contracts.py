@@ -87,10 +87,6 @@ class Dialect(Protocol):
         """Quote an identifier with the engine's quoting character."""
         ...
 
-    def readonly_violation_patterns(self) -> tuple[str, ...]:
-        """Regex source strings for statements that must never execute."""
-        ...
-
     def eav_system_rules(self, mapping: ColumnMapping) -> str:
         """Dialect-specific EAV rules block injected into the system prompt."""
         ...

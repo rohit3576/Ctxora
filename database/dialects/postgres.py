@@ -10,27 +10,6 @@ from typing import Final
 
 from config.settings import ColumnMapping
 
-_FORBIDDEN_VERBS: Final = (
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "DROP",
-    "ALTER",
-    "TRUNCATE",
-    "CREATE",
-    "GRANT",
-    "REVOKE",
-    "VACUUM",
-    "ANALYZE",
-    "REINDEX",
-    "CLUSTER",
-    "CALL",
-    "DO",
-    "COPY",
-    "LISTEN",
-    "NOTIFY",
-)
-
 _INTERVAL_TOKEN_COUNT: Final = 2
 
 
@@ -79,10 +58,6 @@ class PostgresDialect:
     def quote_ident(self, name: str) -> str:
         """Quote an identifier with double quotes."""
         return f'"{name}"'
-
-    def readonly_violation_patterns(self) -> tuple[str, ...]:
-        """Word-boundary regexes for forbidden statements, incl. PG admin verbs."""
-        return tuple(rf"\b{verb}\b" for verb in _FORBIDDEN_VERBS)
 
     def eav_system_rules(self, mapping: ColumnMapping) -> str:
         """Render the dialect-specific EAV rules block for the system prompt."""
