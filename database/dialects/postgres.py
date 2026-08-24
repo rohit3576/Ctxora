@@ -45,6 +45,11 @@ class PostgresDialect:
         """Dialect identifier used in config and logging."""
         return "postgres"
 
+    @property
+    def sqlglot_name(self) -> str:
+        """Return the sqlglot dialect identifier for AST parsing."""
+        return "postgres"
+
     def cast_numeric(self, value_expr: str) -> str:
         """Null-safe numeric cast: NULLIF(expr, '')::double precision."""
         return f"NULLIF({value_expr}, '')::double precision"

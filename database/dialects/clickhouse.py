@@ -35,6 +35,11 @@ class ClickHouseDialect:
         """Dialect identifier used in config and logging."""
         return "clickhouse"
 
+    @property
+    def sqlglot_name(self) -> str:
+        """Return the sqlglot dialect identifier for AST parsing."""
+        return "clickhouse"
+
     def cast_numeric(self, value_expr: str) -> str:
         """Null-safe numeric cast: toFloat64OrNull(expr)."""
         return f"toFloat64OrNull({value_expr})"

@@ -58,6 +58,11 @@ class Dialect(Protocol):
         """Dialect identifier used in config and logging."""
         ...
 
+    @property
+    def sqlglot_name(self) -> str:
+        """Return the sqlglot dialect identifier for AST parsing."""
+        ...
+
     def cast_numeric(self, value_expr: str) -> str:
         """Null-safe numeric cast of the EAV value column."""
         ...

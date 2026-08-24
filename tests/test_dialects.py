@@ -110,3 +110,7 @@ class TestDialectParity:
     def test_both_dialects_declare_expected_names(self) -> None:
         assert ClickHouseDialect().name == "clickhouse"
         assert PostgresDialect().name == "postgres"
+
+    def test_both_dialects_declare_expected_sqlglot_names(self) -> None:
+        assert ClickHouseDialect().sqlglot_name == "clickhouse"
+        assert PostgresDialect().sqlglot_name == "postgres"
