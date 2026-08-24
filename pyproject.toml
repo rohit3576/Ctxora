@@ -94,6 +94,13 @@ reportUnknownMemberType = "none"
 reportUnknownVariableType = "none"
 reportUnknownParameterType = "none"
 
+# agent/validator.py: sqlglot's parse ships **opts typed as Unknown; the
+# validator passes only (sql, read=) and narrows the result immediately.
+[[tool.basedpyright.executionEnvironments]]
+root = "agent"
+extraPaths = ["."]
+reportUnknownMemberType = "none"
+
 # PyJWT ships partial stubs; decode/encode partially unknown at the two
 # auth boundaries. Contained here instead of annotating around the library.
 [[tool.basedpyright.executionEnvironments]]

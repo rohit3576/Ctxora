@@ -1,16 +1,10 @@
 """Adversarial battery: every attack shape the validator MUST reject.
 
-Written RED against the current regex validator (Phase 2 of the sqlglot
-migration, docs/fix/PLAN-sqlglot-migration-phases.md). Cases the regex
-validator currently ACCEPTS are locked with xfail(strict=True) — a ratchet:
-if one unexpectedly passes, the suite goes red (XPASS) and the lock is broken.
-
-Phase 4 (AST rewrite) removes the markers; every case must then be green.
-
-Dry-run 2026-08-24 (regex validator, sqlglot==27.29.0 era): 9 of 26
-must-reject cases accepted -> R1-ch, R1-pg, R2-pg, R4-pg, R7-pg,
-R8-pgreadfile-pg, R8-pgreadbin-pg, R10-pg, R12-for-share-pg
-(the FOR SHARE twin was dry-run separately after the batch).
+Born RED against the regex validator (Phase 2 of the sqlglot migration,
+docs/fix/PLAN-sqlglot-migration-phases.md): 9 of 26 must-reject cases were
+accepted by the regexes (R1-ch, R1-pg, R2-pg, R4-pg, R7-pg, R8-pgreadfile-pg,
+R8-pgreadbin-pg, R10-pg, R12-for-share-pg) and were xfail-locked. Phase 4's
+AST rewrite closed all nine; every case is now a permanent green regression.
 """
 
 import pytest
@@ -20,8 +14,6 @@ from config.settings import ColumnMapping
 from database.contracts import Dialect
 from database.dialects.clickhouse import ClickHouseDialect
 from database.dialects.postgres import PostgresDialect
-
-_BYPASS = "regex bypass — closed by AST validator (Phase 4)"
 
 
 def _mapping() -> ColumnMapping:
@@ -49,14 +41,12 @@ _MUST_REJECT = (
         ClickHouseDialect(),
         "table not allowed",
         id="R1-clickhouse",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     pytest.param(
         "SELECT * FROM demo_telemetry, sql_agent_tenants WHERE 1 = 1",
         PostgresDialect(),
         "table not allowed",
         id="R1-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     # R2 — comment-split verb in a writable CTE: \bDELETE\b never matches.
     pytest.param(
@@ -64,7 +54,6 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R2-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     # R3 — stacked statements (rejected today by the DROP verb; regression).
     pytest.param(
@@ -85,7 +74,6 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R4-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     # R5 — engine admin verbs with non-SELECT heads.
     pytest.param("SHOW TABLES", ClickHouseDialect(), None, id="R5-show-clickhouse"),
@@ -111,7 +99,6 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R7-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     # R8 — dangerous functions. FROM-position ones die as "table not allowed"
     # today (wrong reason, still rejected); SCALAR ones sail through (bypass).
@@ -126,14 +113,12 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R8-pgreadfile-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     pytest.param(
         "SELECT pg_read_binary_file('/etc/shadow')",
         PostgresDialect(),
         None,
         id="R8-pgreadbinfile-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     pytest.param("SELECT * FROM s3('https://x')", ClickHouseDialect(), None, id="R8-s3-clickhouse"),
     # R9 — unparseable garbage must fail closed (head check today).
@@ -145,7 +130,6 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R10-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
     # R11 — qualified-name smuggling: leaf matches allowlist, qualifier doesn't.
     pytest.param(
@@ -175,7 +159,6 @@ _MUST_REJECT = (
         PostgresDialect(),
         None,
         id="R12-for-share-postgres",
-        marks=pytest.mark.xfail(strict=True, reason=_BYPASS),
     ),
 )
 
@@ -204,7 +187,7 @@ _MUST_PASS = (
         id="G2-postgres",
     ),
     pytest.param(
-        "SELECT entity_id FROM demo_telemetry UNION SELECT entity_id FROM demo_telemetry",
+        "SELECT entity_id FROM demo_telemetry UNION ALL SELECT entity_id FROM demo_telemetry",
         ClickHouseDialect(),
         id="G3-clickhouse",
     ),
