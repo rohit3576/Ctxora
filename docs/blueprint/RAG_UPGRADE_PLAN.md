@@ -184,9 +184,7 @@ the user had written the full question.
 - **New module:** `rag/rewrite.py`.
 
 ```python
-def rewrite_query(
-    llm: LLMClient, question: str, recent_turns: list[str] | None
-) -> str:
+def rewrite_query(llm: LLMClient, question: str, recent_turns: list[str] | None) -> str:
     """Self-contained retrieval query from question + recent turns.
 
     No context or already self-contained -> question unchanged.
@@ -264,8 +262,10 @@ CREATE INDEX IF NOT EXISTS idx_rag_chunks_tsv ON rag_chunks USING gin (body_tsv)
 ```python
 # rag/fusion.py
 def rrf_fuse(
-    dense: list[RetrievedChunk], lexical: list[RetrievedChunk],
-    k: int = 60, top_k: int = 5,
+    dense: list[RetrievedChunk],
+    lexical: list[RetrievedChunk],
+    k: int = 60,
+    top_k: int = 5,
 ) -> list[RetrievedChunk]:
     """Reciprocal-rank fusion: score = Σ 1/(k + rank); dedupe by (document, chunk text)."""
 ```
