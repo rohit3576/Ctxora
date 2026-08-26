@@ -10,7 +10,9 @@ services:
       POSTGRES_PASSWORD: ${METADATA_DB_PASSWORD:-ctxora}
       POSTGRES_DB: ${METADATA_DB_NAME:-ctxora}
     ports:
-      - "127.0.0.1:5432:5432"
+      # Host port 5433: 5432 is deliberately left free for other local stacks
+      # so ctxora never competes for it.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
