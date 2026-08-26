@@ -13,6 +13,12 @@ No phase starts implementation before its doc is approved.
 | 5 | Document RAG + routing + advisor | ✅ COMPLETE | [PHASE_5.md](PHASE_5.md) |
 | 6 | Backend pluralism + semantic examples | ✅ COMPLETE | [PHASE_6.md](PHASE_6.md) |
 | 7 | v1.0 polish & release | ✅ COMPLETE — **project v1.0** | [PHASE_7.md](PHASE_7.md) |
+| — | *v1.1 RAG upgrade track (R1–R4)* | | [*plan*](../blueprint/RAG_UPGRADE_PLAN.md) |
+| R1 | Golden set + retrieval eval harness | ✅ COMPLETE (live baseline pending owner) | [R1.md](R1.md) |
+| R2 | Session-aware query rewriting | ⬜ planned | — |
+| R3 | Hybrid BM25 + dense, RRF fusion | ⬜ planned | — |
+| R4 | Structure-aware chunking + metadata/versioning | ⬜ planned | — |
+| — | *v1.1 SQL/sqlglot track (S1–S5)* | | [*plan*](../blueprint/SQLGLOT_UPGRADE_PLAN.md) |
 
 ## Review workflow
 
