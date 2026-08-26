@@ -1,0 +1,280 @@
+# RAG golden set (R1 baseline). Expectations reference demo/docs/*.md —
+# tests/test_demo_docs.py locks the corpus facts these questions probe.
+# `context` is prior conversation for followup-tagged cases: the baseline
+# scores the bare question (the pain R2 fixes); post-R2 the rewrite uses it.
+
+- id: err-e302
+  tenant: demo
+  question: What does error code E-302 mean?
+  expect: { documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md], section: Error Codes }
+  tags: [identifier]
+
+- id: err-e304
+  tenant: demo
+  question: The door sensor reports error E-304
+  expect: { document: door-sensor-ds200-manual-v2.md, section: Error Codes }
+  tags: [identifier]
+
+- id: part-ts001
+  tenant: demo
+  question: What part number is the DS-200 sensor unit?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Specifications
+  tags: [identifier]
+
+- id: part-ts004
+  tenant: demo
+  question: Which gasket part number do I order for the DS-200?
+  expect: { document: door-sensor-ds200-manual-v2.md, section: Gasket Replacement }
+  tags: [identifier]
+
+- id: alarm-a101
+  tenant: demo
+  question: What does alarm code A-101 mean on the reefer unit?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Alarm Codes
+  tags: [identifier]
+
+- id: alarm-a104
+  tenant: demo
+  question: What is alarm A-104?
+  expect: { document: refrigeration-ru500-manual-v2.3.md, section: Alarm Codes }
+  tags: [identifier]
+
+- id: rating-240v
+  tenant: demo
+  question: Is the RU-500 compressor motor a 240 V unit?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Electrical Specifications
+  tags: [identifier]
+
+- id: defrost-heater-240v
+  tenant: demo
+  question: What current does the 240 V defrost heater draw?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Electrical Specifications
+  tags: [identifier]
+
+- id: charge-1-8kg
+  tenant: demo
+  question: Does the RU-500 take a 1.8 kg refrigerant charge?
+  expect: { document: refrigeration-ru500-manual-v2.0.md, section: Refrigerant Specifications }
+  tags: [identifier]
+
+- id: err-e303-battery
+  tenant: demo
+  question: What does error E-303 battery low indicate?
+  expect: { document: door-sensor-ds200-manual-v1.md, section: Error Codes }
+  tags: [identifier]
+
+- id: lube-interval
+  tenant: demo
+  question: How often should the trailer door hinges be greased?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Maintenance Procedure
+  tags: [paraphrase]
+
+- id: suction-loss
+  tenant: demo
+  question: Why would the reefer unit lose suction pressure?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Pressure Settings
+  tags: [paraphrase]
+
+- id: bolt-torque
+  tenant: demo
+  question: How tight should the door sensor mounting bolts be?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Maintenance Procedure
+  tags: [paraphrase]
+
+- id: low-refrigerant
+  tenant: demo
+  question: How do I know if the cooling unit is running low on refrigerant?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Refrigerant Specifications
+  tags: [paraphrase]
+
+- id: door-open-check
+  tenant: demo
+  question: My trailer door contact keeps reporting open, what should I check?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Troubleshooting
+  tags: [paraphrase]
+
+- id: oil-interval
+  tenant: demo
+  question: How frequently must the compressor oil be changed?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Service Intervals
+  tags: [paraphrase]
+
+- id: door-alarm-blink
+  tenant: demo
+  question: What does the blinking door alarm on my sensor mean?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Error Codes
+  tags: [paraphrase]
+
+- id: sensor-service-steps
+  tenant: demo
+  question: What are the steps to service the door sensor?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Maintenance Procedure
+  tags: [paraphrase]
+
+- id: suction-cutout
+  tenant: demo
+  question: What is the suction cut-out pressure threshold?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Pressure Settings
+  tags: [table]
+
+- id: discharge-cutout
+  tenant: demo
+  question: At what pressure does the discharge cut-out trip?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Pressure Settings
+  tags: [table]
+
+- id: fan-spec
+  tenant: demo
+  question: What are the condenser fan voltage and current?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Electrical Specifications
+  tags: [table]
+
+- id: oil-quantity
+  tenant: demo
+  question: How much POE oil does the compressor hold?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Refrigerant Specifications
+  tags: [table]
+
+- id: supply-voltage
+  tenant: demo
+  question: What supply voltage range does the DS-200 accept?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Specifications
+  tags: [table]
+
+- id: refrigerant-type
+  tenant: demo
+  question: Which refrigerant does the refrigeration unit use?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Refrigerant Specifications
+  tags: [table]
+
+- id: full-maintenance
+  tenant: demo
+  question: Walk me through the full DS-200 maintenance procedure
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Maintenance Procedure
+  tags: [procedure]
+
+- id: torque-step
+  tenant: demo
+  question: Which maintenance step covers torquing the bolts?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Maintenance Procedure
+  tags: [procedure]
+
+- id: defrost-steps
+  tenant: demo
+  question: What are the defrost procedure steps?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Defrost Procedure
+  tags: [procedure]
+
+- id: gasket-steps
+  tenant: demo
+  question: How do I replace the DS-200 gasket?
+  expect: { document: door-sensor-ds200-manual-v2.md, section: Gasket Replacement }
+  tags: [procedure]
+
+- id: firmware-check
+  tenant: demo
+  question: Does maintenance include a firmware check?
+  expect: { document: door-sensor-ds200-manual-v2.md, section: Maintenance Procedure }
+  tags: [procedure]
+
+- id: compressor-service
+  tenant: demo
+  question: What is the compressor service procedure?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Compressor Service Procedure
+  tags: [procedure]
+
+- id: followup-fix-it
+  tenant: demo
+  question: How do I fix it?
+  context:
+    - My DS-200 shows error E-302 every morning.
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Troubleshooting
+  tags: [followup]
+
+- id: followup-ru500-too
+  tenant: demo
+  question: What about the RU-500?
+  context:
+    - What lubrication interval does the DS-200 manual specify?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Service Intervals
+  tags: [followup]
+
+- id: followup-that-limit
+  tenant: demo
+  question: What is that limit?
+  context:
+    - The RU-500 discharge pressure keeps hitting the cut-out.
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Pressure Settings
+  tags: [followup]
+
+- id: e302-wiring-check
+  tenant: demo
+  question: Which maintenance step addresses the E-302 wiring problem?
+  expect:
+    documents: [door-sensor-ds200-manual-v1.md, door-sensor-ds200-manual-v2.md]
+    section: Troubleshooting
+  tags: [multi-hop]
+
+- id: battery-replace-part
+  tenant: demo
+  question: Does the battery-low error mean I replace sensor part TS-001?
+  expect: { document: door-sensor-ds200-manual-v1.md, section: Error Codes }
+  tags: [multi-hop]
+
+- id: pulldown-pressure
+  tenant: demo
+  question: After replacing the filter drier, what pressure should the system pull down to?
+  expect:
+    documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
+    section: Pressure Settings
+  tags: [multi-hop]

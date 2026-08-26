@@ -1,9 +1,41 @@
 """In-memory RagStore fake: exact-neighbor search over cosine similarity."""
 
 import datetime
+import hashlib
 import math
+import re
+from collections.abc import Sequence
 
+from llm.client import GenResult
 from rag.contracts import ChunkInsert, DocumentRecord, RetrievedChunk
+
+_EMBED_DIM: int = 1536  # must match rag_chunks.embedding VECTOR(1536)
+_TOKEN: re.Pattern[str] = re.compile(r"[a-z0-9][a-z0-9.-]*")
+
+
+class HashEmbedLLM:
+    """Deterministic LLMClient whose embeddings are bag-of-words hashes.
+
+    Cosine over these vectors approximates token overlap (lexical search),
+    which makes offline retrieval smoke runs stable and meaningful-shaped.
+    Real recall numbers still require a real embedding model.
+    """
+
+    def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
+        """Canned completion; this fake is only ever used for embedding."""
+        return GenResult(sql="SELECT 1", raw="", prompt_tokens=1, completion_tokens=1)
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        """One 1536-dim bag-of-words hash vector per text."""
+        vectors: list[list[float]] = []
+        for text in texts:
+            vector = [0.0] * _EMBED_DIM
+            for token in _TOKEN.findall(text.lower()):
+                digest = hashlib.md5(token.encode("utf-8"), usedforsecurity=False).digest()
+                index = int.from_bytes(digest[:4], "big") % _EMBED_DIM
+                vector[index] += 1.0
+            vectors.append(vector)
+        return vectors
 
 
 def _cosine(left: list[float], right: list[float]) -> float:

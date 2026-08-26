@@ -293,6 +293,9 @@ fixable = ["ALL"]
     "T201",     # seed script prints progress by design
     "S311",     # synthetic data, not cryptographic
 ]
+"tools/**/*.py" = [
+    "T201",     # CLI harness prints its report by design
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
