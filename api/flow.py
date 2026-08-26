@@ -56,6 +56,27 @@ def conversation_context(memory: MemoryStore, session: Session) -> ConversationC
     return None
 
 
+def rag_recent_turns(memory: MemoryStore, tenant: str, session_id: str | None) -> list[str]:
+    """NL queries of the session's prior turns for RAG rewriting (best-effort).
+
+    Empty when the session is unknown, cross-tenant, or memory fails: the
+    rewrite is an enhancement, never a dependency.
+    """
+    if session_id is None:
+        return []
+    try:
+        session = memory.fetch_session(session_id)
+        if session is None or session.tenant != tenant:
+            return []
+        context = conversation_context(memory, session)
+    except Exception as exc:  # noqa: BLE001 (boundary: rewrite context must never break answering)
+        _logger.warning("rag session context load failed (non-blocking): %s", exc)
+        return []
+    if context is None:
+        return []
+    return [turn.nl_query for turn in context.turns]
+
+
 def record_turn(
     memory: MemoryStore,
     resolution: SessionResolution,

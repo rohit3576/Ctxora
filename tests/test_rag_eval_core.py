@@ -163,13 +163,12 @@ class TestFakeEndToEnd:
         from demo.seed_docs import HASH_EMBEDDING_MODEL, seed_documents
 
         cases = load_golden(GOLDEN_PATH)
+        config = load_app_config().rag
 
         def run_once() -> list[float]:
             store = InMemoryRagStore()
-            seed_documents(
-                store, HashEmbedLLM(), load_app_config().rag, "demo", HASH_EMBEDDING_MODEL
-            )
-            results = evaluate(store, HashEmbedLLM(), cases, ks=(1, 3, 5, 10))
+            seed_documents(store, HashEmbedLLM(), config, "demo", HASH_EMBEDDING_MODEL)
+            results = evaluate(store, HashEmbedLLM(), config, cases, ks=(1, 3, 5, 10))
             return [result.rank if result.rank is not None else 0.0 for result in results]
 
         assert run_once() == run_once()
@@ -179,9 +178,10 @@ class TestFakeEndToEnd:
         from demo.seed_docs import HASH_EMBEDDING_MODEL, seed_documents
 
         cases = load_golden(GOLDEN_PATH)
+        config = load_app_config().rag
         store = InMemoryRagStore()
-        seed_documents(store, HashEmbedLLM(), load_app_config().rag, "demo", HASH_EMBEDDING_MODEL)
-        summary = summarize(evaluate(store, HashEmbedLLM(), cases, ks=(5,)), ks=(5,))
+        seed_documents(store, HashEmbedLLM(), config, "demo", HASH_EMBEDDING_MODEL)
+        summary = summarize(evaluate(store, HashEmbedLLM(), config, cases, ks=(5,)), ks=(5,))
 
         by_tag = {tag.label: tag for tag in summary.per_tag}
         identifier_r5 = dict(by_tag["identifier"].recall_at_k)[5]

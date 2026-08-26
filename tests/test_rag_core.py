@@ -6,12 +6,14 @@ import pytest
 
 from config.settings import RagConfig, RoutingConfig
 from llm.client import GenResult
+from llm.openai_compat import LLMError
 from rag.chunker import ChunkedPage, chunk_pages
 from rag.contracts import ChunkInsert, RagStore
 from rag.fake import InMemoryRagStore
 from rag.ingest import IngestError, ingest
 from rag.parsers import UnsupportedFormatError, parse
 from rag.rag_flow import UngroundedError, advise, answer_grounded, retrieve
+from rag.rewrite import rewrite_query
 from routing.router import classify
 
 MANUAL = b"""# Coolant Guidelines
@@ -217,3 +219,125 @@ class TestProtocolConformance:
 
         with pytest.raises(AttributeError):
             setattr(chunk, attribute, "other")
+
+
+class _FailingGenLLM:
+    """generate() always raises the client's typed LLM error."""
+
+    def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
+        msg = "endpoint down"
+        raise LLMError(msg)
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        unreachable = "embed must not be reached when rewrite fails"
+        raise AssertionError(unreachable)
+
+
+class TestRewriteQuery:
+    def test_no_turns_returns_question_without_llm_call(self) -> None:
+        llm = RagLLM()
+
+        assert rewrite_query(llm, "How do I fix it?", []) == "How do I fix it?"
+
+    def test_llm_rewrite_is_returned(self) -> None:
+        llm = RagLLM(answers=["DS-200 door sensor error E-302 fix procedure"])
+
+        result = rewrite_query(llm, "How do I fix it?", ["My DS-200 shows error E-302"])
+
+        assert result == "DS-200 door sensor error E-302 fix procedure"
+
+    def test_prompt_carries_turns_and_question(self) -> None:
+        llm = RagLLM(answers=["merged"])
+
+        rewrite_query(llm, "How do I fix it?", ["turn one", "turn two"])
+
+        assert llm.embedded == []  # generate used, embed untouched (recorder doubles as call check)
+
+    def test_empty_llm_output_falls_back_to_question(self) -> None:
+        llm = RagLLM(answers=["   "])
+
+        assert rewrite_query(llm, "How do I fix it?", ["context turn"]) == "How do I fix it?"
+
+    def test_llm_failure_falls_back_to_question(self) -> None:
+        result = rewrite_query(_FailingGenLLM(), "How do I fix it?", ["context turn"])
+
+        assert result == "How do I fix it?"
+
+    def test_oversized_rewrite_falls_back_to_question(self) -> None:
+        llm = RagLLM(answers=["word " * 1000])
+
+        result = rewrite_query(llm, "How do I fix it?", ["context turn"])
+
+        assert result == "How do I fix it?"
+
+
+class TestRetrieveWithRewrite:
+    def _config(self, **overrides: object) -> RagConfig:
+        return RagConfig(**overrides)  # type: ignore[arg-type]
+
+    def test_flag_off_embeds_raw_question_without_llm_call(self) -> None:
+        llm = RagLLM(answers=["should never be used"])
+        store = InMemoryRagStore()
+        config = self._config(query_rewrite=False)
+
+        retrieve(store, llm, config, "demo", "How do I fix it?", ["E-302 context"])
+
+        assert llm.embedded == ["How do I fix it?"]
+        assert llm.answers == ["should never be used"]  # generate never consumed
+
+    def test_no_turns_embeds_raw_question_without_llm_call(self) -> None:
+        llm = RagLLM(answers=["should never be used"])
+        store = InMemoryRagStore()
+
+        retrieve(store, llm, self._config(), "demo", "What coolant range?")
+
+        assert llm.embedded == ["What coolant range?"]
+        assert llm.answers == ["should never be used"]
+
+    def test_flag_on_with_turns_embeds_rewritten_query(self) -> None:
+        llm = RagLLM(answers=["coolant temperature acceptable range"])
+        store = InMemoryRagStore()
+
+        retrieve(store, llm, self._config(), "demo", "What about it?", ["coolant context"])
+
+        assert llm.embedded == ["coolant temperature acceptable range"]
+
+    def test_turns_sliced_to_configured_window(self) -> None:
+        llm = RagLLM(answers=["rewritten"])
+        store = InMemoryRagStore()
+        config = self._config(rewrite_history_turns=2)
+
+        retrieve(
+            store,
+            llm,
+            config,
+            "demo",
+            "and the sensor?",
+            ["turn 1", "turn 2", "turn 3", "turn 4"],
+        )
+
+        assert llm.embedded == ["rewritten"]
+
+
+class TestFollowupMechanismEndToEnd:
+    def test_scripted_rewrite_lifts_followup_retrieval(self) -> None:
+        from config.settings import load_app_config
+        from demo.seed_docs import seed_documents
+        from rag.fake import HashScriptedLLM
+
+        llm = HashScriptedLLM(generated=["DS-200 door sensor error E-302 signal loss how to fix"])
+        store = InMemoryRagStore()
+        seed_documents(store, llm, load_app_config().rag, "demo", "hash-embed-1536")
+
+        chunks = retrieve(
+            store,
+            llm,
+            load_app_config().rag,
+            "demo",
+            "How do I fix it?",
+            ["My DS-200 door sensor shows error E-302 every morning."],
+        )
+
+        assert chunks
+        assert any("Troubleshooting" in chunk.section_title for chunk in chunks)
+        assert llm.embedded[-1] == "DS-200 door sensor error E-302 signal loss how to fix"

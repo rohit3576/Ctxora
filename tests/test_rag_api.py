@@ -11,6 +11,7 @@ from api.schemas import Envelope
 from config.settings import DEFAULT_CONFIG_PATH, Settings
 from llm.client import GenResult
 from main import create_app
+from memory.contracts import Session, TurnInsert
 from memory.fake import InMemoryMemoryStore
 from rag.contracts import RetrievedChunk
 from rag.fake import InMemoryRagStore
@@ -41,10 +42,15 @@ class RoutingLLM:
     def __init__(self) -> None:
         self.inner: DemoFakeLLM = DemoFakeLLM()
         self.doc_reply: str = "The range is 70 to 95 degrees Celsius."
+        self.rewrite_reply: str = ""  # empty default: rewrite degrades to raw question
+        self.rewrite_prompts: list[str] = []  # observation recorder (documented mutation)
 
     def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
         if "incident analysis" in system:
             return GenResult(sql="", raw=ADVISOR_JSON, prompt_tokens=2, completion_tokens=2)
+        if "RECENT CONVERSATION" in user:
+            self.rewrite_prompts.append(user)
+            return GenResult(sql="", raw=self.rewrite_reply, prompt_tokens=1, completion_tokens=1)
         if "CONTEXT:" in user:
             return GenResult(sql="", raw=self.doc_reply, prompt_tokens=2, completion_tokens=2)
         return self.inner.generate(system, user, temperature=temperature)
@@ -169,6 +175,102 @@ class TestRagQuery:
         assert response.status_code == 404
         body: dict[str, object] = response.json()
         assert body["errorType"] == "NO_DOCUMENTS"
+
+
+class TestSessionFollowup:
+    def _seeded_session(self, memory: InMemoryMemoryStore) -> Session:
+        session = memory.create_session("demo", "coolant")
+        memory.append_turn(
+            TurnInsert(
+                tenant="demo",
+                session_id=session.id,
+                nl_query="What is the acceptable coolant temperature?",
+                sql=DEMO_SQL,
+                data=(),
+                summary="coolant range",
+                token_usage=1,
+            )
+        )
+        return session
+
+    def _app(
+        self, memory: InMemoryMemoryStore, llm: RoutingLLM, rag_store: InMemoryRagStore
+    ) -> TestClient:
+        app = create_app(
+            settings=Settings(),
+            config_path=DEFAULT_CONFIG_PATH,
+            store=DemoStore(),
+            knowledge_query=demo_knowledge_query,
+            llm=llm,
+            memory=memory,
+            rag_store=rag_store,
+        )
+        return TestClient(app)
+
+    def test_session_turns_rewrite_followup_before_retrieval(self) -> None:
+        memory = InMemoryMemoryStore()
+        session = self._seeded_session(memory)
+        llm = RoutingLLM()
+        llm.rewrite_reply = "coolant temperature acceptable range"
+        rag_store = InMemoryRagStore()
+        with self._app(memory, llm, rag_store) as client:
+            upload_manual(client)
+
+            response = client.post(
+                "/v1/rag/query",
+                json={
+                    "tenant": "demo",
+                    "question": "What about it?",
+                    "sessionId": session.id,
+                },
+            )
+
+        assert response.status_code == 200
+        envelope = Envelope[RAGAnswerData].model_validate_json(response.content)
+        assert envelope.data is not None
+        assert envelope.data.sources
+        assert len(llm.rewrite_prompts) == 1
+        assert "acceptable coolant temperature" in llm.rewrite_prompts[0]
+
+    def test_unknown_session_answers_without_rewrite(self) -> None:
+        memory = InMemoryMemoryStore()
+        llm = RoutingLLM()
+        rag_store = InMemoryRagStore()
+        with self._app(memory, llm, rag_store) as client:
+            upload_manual(client)
+
+            response = client.post(
+                "/v1/rag/query",
+                json={
+                    "tenant": "demo",
+                    "question": "what is the acceptable coolant temperature range?",
+                    "sessionId": "does-not-exist",
+                },
+            )
+
+        assert response.status_code == 200
+        assert llm.rewrite_prompts == []
+
+    def test_cross_tenant_session_answers_without_rewrite(self) -> None:
+        memory = InMemoryMemoryStore()
+        self._seeded_session(memory)
+        llm = RoutingLLM()
+        llm.rewrite_reply = "should never be used"
+        rag_store = InMemoryRagStore()
+        with self._app(memory, llm, rag_store) as client:
+            upload_manual(client, tenant="demo")
+
+            response = client.post(
+                "/v1/rag/query",
+                json={
+                    "tenant": "demo",
+                    "question": "what is the acceptable coolant temperature range?",
+                    "sessionId": memory.create_session("other", "not yours").id,
+                },
+            )
+
+        assert response.status_code == 200
+        assert llm.rewrite_prompts == []
 
 
 class TestUnifiedRouting:

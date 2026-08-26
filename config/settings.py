@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import ClassVar, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CONFIG_PATH: Path = Path(__file__).parent / "defaults.yaml"
@@ -29,6 +29,19 @@ class ConfigError(Exception):
         self.path: Path = path
         self.detail: str = detail
         super().__init__(f"invalid config {path}: {detail}")
+
+
+# Provider presets: set LLM_PROVIDER + LLM_API_KEY and the rest derives.
+# Explicit env vars (LLM_BASE_URL, LLM_MODEL, …) always win over the preset.
+_PROVIDER_PRESETS: dict[str, dict[str, str | int]] = {
+    "openai": {},
+    "gemini": {
+        "llm_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "llm_model": "gemini-2.5-flash",
+        "embedding_model": "gemini-embedding-001",
+        "embedding_dimensions": 1536,  # match rag_chunks VECTOR(1536)
+    },
+}
 
 
 class Settings(BaseSettings):
@@ -50,11 +63,26 @@ class Settings(BaseSettings):
     telemetry_db_user: str | None = None
     telemetry_db_password: str | None = None
 
-    # LLM (any OpenAI-compatible endpoint)
+    # LLM (any OpenAI-compatible endpoint); LLM_PROVIDER presets the rest
+    llm_provider: str = "openai"
     llm_api_key: str | None = None
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int | None = None  # `dimensions` param; rag schema is VECTOR(1536)
+
+    @model_validator(mode="after")
+    def _apply_provider_preset(self) -> "Settings":
+        """Fill unset LLM fields from the provider preset; unknown provider fails."""
+        preset = _PROVIDER_PRESETS.get(self.llm_provider)
+        if preset is None:
+            names = ", ".join(sorted(_PROVIDER_PRESETS))
+            msg = f"unknown LLM_PROVIDER {self.llm_provider!r} (known: {names})"
+            raise ValueError(msg)
+        for field, value in preset.items():
+            if field not in self.model_fields_set:
+                setattr(self, field, value)
+        return self
 
     # Admin surface
     feedback_admin_token: str | None = None
@@ -169,6 +197,8 @@ class RagConfig(BaseModel):
     top_k: int = 5
     max_upload_mb: int = 20
     shared_scope: str = "shared"
+    query_rewrite: bool = True
+    rewrite_history_turns: int = 3
     advisor_template: str = (
         "Analyze this incident and explain: probable causes, consequences, "
         "actions, checklist, and whether operation can continue."

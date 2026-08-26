@@ -15,7 +15,7 @@ No phase starts implementation before its doc is approved.
 | 7 | v1.0 polish & release | ✅ COMPLETE — **project v1.0** | [PHASE_7.md](PHASE_7.md) |
 | — | *v1.1 RAG upgrade track (R1–R4)* | | [*plan*](../blueprint/RAG_UPGRADE_PLAN.md) |
 | R1 | Golden set + retrieval eval harness | ✅ COMPLETE (live baseline pending owner) | [R1.md](R1.md) |
-| R2 | Session-aware query rewriting | ⬜ planned | — |
+| R2 | Session-aware query rewriting | ✅ COMPLETE (live followup R@5 pending owner) | [R2.md](R2.md) |
 | R3 | Hybrid BM25 + dense, RRF fusion | ⬜ planned | — |
 | R4 | Structure-aware chunking + metadata/versioning | ⬜ planned | — |
 | — | *v1.1 SQL/sqlglot track (S1–S5)* | | [*plan*](../blueprint/SQLGLOT_UPGRADE_PLAN.md) |

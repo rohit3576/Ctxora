@@ -51,6 +51,8 @@ rag:
   top_k: 5
   max_upload_mb: 20
   shared_scope: shared
+  query_rewrite: true              # R2: rewrite follow-ups with session context
+  rewrite_history_turns: 3         # how many prior turns feed the rewrite
   advisor_template: >-
     Analyze this incident and explain: probable causes, consequences,
     actions, checklist, and whether operation can continue.

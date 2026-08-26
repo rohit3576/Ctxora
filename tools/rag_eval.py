@@ -13,10 +13,11 @@ import csv
 from pathlib import Path
 from typing import Final
 
-from config.settings import Settings, get_settings, load_app_config
+from config.settings import RagConfig, Settings, get_settings, load_app_config
 from llm.client import LLMClient
 from rag.contracts import RagStore
 from rag.fake import HashEmbedLLM, InMemoryRagStore
+from rag.rag_flow import retrieve
 from tools.rag_eval_core import (
     CaseResult,
     EvalSummary,
@@ -32,13 +33,21 @@ DEFAULT_KS: Final = (1, 3, 5, 10)
 
 
 def evaluate(
-    store: RagStore, llm: LLMClient, cases: tuple[GoldenCase, ...], ks: tuple[int, ...]
+    store: RagStore,
+    llm: LLMClient,
+    config: RagConfig,
+    cases: tuple[GoldenCase, ...],
+    ks: tuple[int, ...],
 ) -> list[CaseResult]:
-    """Run every golden question through the store and score first-hit rank."""
+    """Run every golden question through retrieve() and score first-hit rank.
+
+    Followup cases pass their context turns, so post-R2 live runs exercise
+    the rewrite; the effective top_k is raised to max(ks) for the k-curve.
+    """
+    effective = config.model_copy(update={"top_k": max(ks)})
     results: list[CaseResult] = []
     for case in cases:
-        embedding = llm.embed([case.question])[0]
-        chunks = store.search(embedding, case.tenant, "shared", max(ks))
+        chunks = retrieve(store, llm, effective, case.tenant, case.question, case.context)
         rank = first_hit_rank(chunks, case.expect)
         top = chunks[0].document if chunks else "-"
         results.append(CaseResult(case=case, rank=rank, top_document=top))
@@ -91,20 +100,21 @@ def _parse_ks(raw: str) -> tuple[int, ...]:
     return values
 
 
-def _build_fake(tenant: str) -> tuple[RagStore, LLMClient]:
+def _build_fake(tenant: str) -> tuple[RagStore, LLMClient, RagConfig]:
     """In-memory store + deterministic hash embeddings, seeded from demo docs."""
     from demo.seed_docs import (  # noqa: PLC0415 (mode opt-in deps)
         HASH_EMBEDDING_MODEL,
         seed_documents,
     )
 
+    config = load_app_config().rag
     store = InMemoryRagStore()
     embedder = HashEmbedLLM()
-    seed_documents(store, embedder, load_app_config().rag, tenant, HASH_EMBEDDING_MODEL)
-    return store, embedder
+    seed_documents(store, embedder, config, tenant, HASH_EMBEDDING_MODEL)
+    return store, embedder, config
 
 
-def _build_live(seed: bool, tenant: str) -> tuple[RagStore, LLMClient]:
+def _build_live(seed: bool, tenant: str) -> tuple[RagStore, LLMClient, RagConfig]:
     """PG-backed store + real embeddings; optionally seeds demo docs first."""
     from database.metadata import bootstrap_schema  # noqa: PLC0415 (mode opt-in deps)
     from demo.seed_docs import seed_documents  # noqa: PLC0415 (mode opt-in deps)
@@ -113,12 +123,13 @@ def _build_live(seed: bool, tenant: str) -> tuple[RagStore, LLMClient]:
     from rag.store import PGRagStore  # noqa: PLC0415 (mode opt-in deps)
 
     settings: Settings = get_settings()
+    config = load_app_config().rag
     bootstrap_schema(settings)
     store: RagStore = PGRagStore(metadata_query(settings))
     embedder = OpenAICompatibleClient(settings)
     if seed:
-        seed_documents(store, embedder, load_app_config().rag, tenant, settings.embedding_model)
-    return store, embedder
+        seed_documents(store, embedder, config, tenant, settings.embedding_model)
+    return store, embedder, config
 
 
 def main() -> int:
@@ -143,8 +154,10 @@ def main() -> int:
         print(f"golden set error: {exc.detail}")
         return 2
 
-    store, embedder = _build_live(args.seed, args.tenant) if args.live else _build_fake(args.tenant)
-    results = evaluate(store, embedder, cases, args.ks)
+    store, embedder, config = (
+        _build_live(args.seed, args.tenant) if args.live else _build_fake(args.tenant)
+    )
+    results = evaluate(store, embedder, config, cases, args.ks)
     summary = summarize(results, args.ks)
     mode_label = "live" if args.live else "fake"
     print(render_markdown(summary, mode_label).rstrip())

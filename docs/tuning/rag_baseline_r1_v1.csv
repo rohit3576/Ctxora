@@ -1,0 +1,37 @@
+id,tags,question,rank,rr,top_document,hit@1,hit@3,hit@5,hit@10
+err-e302,identifier,What does error code E-302 mean?,2,0.500,door-sensor-ds200-manual-v1.md,0,1,1,1
+err-e304,identifier,The door sensor reports error E-304,1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+part-ts001,identifier,What part number is the DS-200 sensor unit?,3,0.333,door-sensor-ds200-manual-v1.md,0,1,1,1
+part-ts004,identifier,Which gasket part number do I order for the DS-200?,1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+alarm-a101,identifier,What does alarm code A-101 mean on the reefer unit?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+alarm-a104,identifier,What is alarm A-104?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+rating-240v,identifier,Is the RU-500 compressor motor a 240 V unit?,3,0.333,refrigeration-ru500-manual-v2.0.md,0,1,1,1
+defrost-heater-240v,identifier,What current does the 240 V defrost heater draw?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+charge-1-8kg,identifier,Does the RU-500 take a 1.8 kg refrigerant charge?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+err-e303-battery,identifier,What does error E-303 battery low indicate?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+lube-interval,paraphrase,How often should the trailer door hinges be greased?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+suction-loss,paraphrase,Why would the reefer unit lose suction pressure?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+bolt-torque,paraphrase,How tight should the door sensor mounting bolts be?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+low-refrigerant,paraphrase,How do I know if the cooling unit is running low on refrigerant?,6,0.167,refrigeration-ru500-manual-v2.0.md,0,0,0,1
+door-open-check,paraphrase,"My trailer door contact keeps reporting open, what should I check?",1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+oil-interval,paraphrase,How frequently must the compressor oil be changed?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+door-alarm-blink,paraphrase,What does the blinking door alarm on my sensor mean?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+sensor-service-steps,paraphrase,What are the steps to service the door sensor?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+suction-cutout,table,What is the suction cut-out pressure threshold?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+discharge-cutout,table,At what pressure does the discharge cut-out trip?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+fan-spec,table,What are the condenser fan voltage and current?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+oil-quantity,table,How much POE oil does the compressor hold?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+supply-voltage,table,What supply voltage range does the DS-200 accept?,3,0.333,door-sensor-ds200-manual-v1.md,0,1,1,1
+refrigerant-type,table,Which refrigerant does the refrigeration unit use?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+full-maintenance,procedure,Walk me through the full DS-200 maintenance procedure,3,0.333,door-sensor-ds200-manual-v2.md,0,1,1,1
+torque-step,procedure,Which maintenance step covers torquing the bolts?,1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+defrost-steps,procedure,What are the defrost procedure steps?,1,1.000,refrigeration-ru500-manual-v2.3.md,1,1,1,1
+gasket-steps,procedure,How do I replace the DS-200 gasket?,1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+firmware-check,procedure,Does maintenance include a firmware check?,1,1.000,door-sensor-ds200-manual-v2.md,1,1,1,1
+compressor-service,procedure,What is the compressor service procedure?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+followup-fix-it,followup,How do I fix it?,3,0.333,door-sensor-ds200-manual-v2.md,0,1,1,1
+followup-ru500-too,followup,What about the RU-500?,,0.000,refrigeration-ru500-manual-v2.0.md,0,0,0,0
+followup-that-limit,followup,What is that limit?,1,1.000,refrigeration-ru500-manual-v2.0.md,1,1,1,1
+e302-wiring-check,multi-hop,Which maintenance step addresses the E-302 wiring problem?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+battery-replace-part,multi-hop,Does the battery-low error mean I replace sensor part TS-001?,1,1.000,door-sensor-ds200-manual-v1.md,1,1,1,1
+pulldown-pressure,multi-hop,"After replacing the filter drier, what pressure should the system pull down to?",3,0.333,refrigeration-ru500-manual-v2.3.md,0,1,1,1

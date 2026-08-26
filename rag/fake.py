@@ -38,6 +38,31 @@ class HashEmbedLLM:
         return vectors
 
 
+class HashScriptedLLM:
+    """Hash embeddings + scripted generate() replies, with an embed recorder.
+
+    For rewrite-mechanism tests: deterministic lexical embeddings plus canned
+    LLM outputs (a simulated good rewriter). `embedded` records every text
+    that reached the embedder — mutation is the documented observation purpose.
+    """
+
+    def __init__(self, generated: Sequence[str]) -> None:
+        """Queue the canned generate() replies (consumed in order)."""
+        self._hash: HashEmbedLLM = HashEmbedLLM()
+        self._generated: list[str] = list(generated)
+        self.embedded: list[str] = []
+
+    def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
+        """Replay the next canned reply."""
+        raw = self._generated.pop(0) if self._generated else ""
+        return GenResult(sql="", raw=raw, prompt_tokens=1, completion_tokens=1)
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        """Delegate to the hash embedder, recording what was embedded."""
+        self.embedded.extend(texts)
+        return self._hash.embed(texts)
+
+
 def _cosine(left: list[float], right: list[float]) -> float:
     """Cosine similarity of two equal-length vectors."""
     dot = sum(a * b for a, b in zip(left, right, strict=True))

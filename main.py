@@ -95,7 +95,9 @@ def create_app(
             active_check=lambda tenant: not tenant_disabled(executor, tenant),
         )
     )
-    app.include_router(build_rag_router(resolved_rag, resolved_llm, app_config.rag))
+    app.include_router(
+        build_rag_router(resolved_rag, resolved_llm, app_config.rag, resolved_memory)
+    )
     app.include_router(
         build_documents_router(
             resolved_rag,

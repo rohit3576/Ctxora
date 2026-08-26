@@ -1,7 +1,7 @@
 """Query API: POST /v1/query/sql (sync NL->SQL endpoint)."""
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import ClassVar
 
 from fastapi import APIRouter, Header
@@ -21,7 +21,7 @@ from agent.pipeline import (
     run_query,
 )
 from api.auth import TenantAuth, UnauthorizedError
-from api.flow import conversation_context, record_turn, resolve_session
+from api.flow import conversation_context, rag_recent_turns, record_turn, resolve_session
 from api.ratelimit import TokenBucketLimiter
 from api.schemas import Envelope
 from feedback.contracts import FeedbackStore
@@ -217,11 +217,15 @@ def _mine_correction(
 
 
 def _rag_answer(
-    deps: AgentDeps, rag_store: RagStore, tenant: str, question: str
+    deps: AgentDeps,
+    rag_store: RagStore,
+    tenant: str,
+    question: str,
+    recent_turns: Sequence[str] = (),
 ) -> dict[str, object] | None:
     """Grounded doc answer; None when unavailable or ungrounded (logged)."""
     try:
-        chunks = retrieve(rag_store, deps.llm, deps.config.rag, tenant, question)
+        chunks = retrieve(rag_store, deps.llm, deps.config.rag, tenant, question, recent_turns)
         if not chunks:
             return None
         text, sources = answer_grounded(deps.llm, question, chunks)
@@ -234,6 +238,20 @@ def _rag_answer(
         "answer": text,
         "sources": list(sources),
     }
+
+
+def _unified_rag_part(
+    deps: AgentDeps,
+    rag_store: RagStore | None,
+    memory: MemoryStore,
+    request: UnifiedQueryRequest,
+    intent: str,
+) -> dict[str, object] | None:
+    """Grounded doc part for docs/hybrid intents (session-aware, None-safe)."""
+    if rag_store is None or intent not in ("docs", "hybrid"):
+        return None
+    rag_turns = rag_recent_turns(memory, request.tenant, request.sessionId)
+    return _rag_answer(deps, rag_store, request.tenant, request.query, rag_turns)
 
 
 def build_query_router(
@@ -303,11 +321,7 @@ def build_query_router(
             sessionId=effective.sessionId,
         )
         decision: RouteDecision = classify(request.query, deps.config.routing)
-        rag_part: dict[str, object] | None = None
-        if rag_store is not None and decision.intent in ("docs", "hybrid"):
-            rag_part = _rag_answer(
-                deps, rag_store, effective_unified.tenant, effective_unified.query
-            )
+        rag_part = _unified_rag_part(deps, rag_store, memory, effective_unified, decision.intent)
 
         if decision.intent == "docs":
             if rag_part is None:

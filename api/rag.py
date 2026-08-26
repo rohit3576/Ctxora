@@ -7,9 +7,11 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.flow import rag_recent_turns
 from api.schemas import Envelope
 from config.settings import RagConfig
 from llm.client import LLMClient
+from memory.contracts import MemoryStore
 from rag.contracts import RagStore
 from rag.rag_flow import UngroundedError, advise, answer_grounded, retrieve
 
@@ -19,12 +21,13 @@ _ROW_TYPE = dict[str, float | int | str | bool | None]
 
 
 class RAGQueryRequest(BaseModel):
-    """One documentation question."""
+    """One documentation question (optionally inside a session for follow-ups)."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     tenant: str = Field(min_length=1, max_length=50)
     question: str = Field(min_length=1, max_length=2000)
+    sessionId: str | None = None
 
 
 class SourceView(BaseModel):
@@ -81,13 +84,20 @@ def _failure(status_code: int, error_type: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=content)
 
 
-def build_rag_router(rag_store: RagStore, llm: LLMClient, config: RagConfig) -> APIRouter:
+def build_rag_router(
+    rag_store: RagStore, llm: LLMClient, config: RagConfig, memory: MemoryStore | None = None
+) -> APIRouter:
     """Build the RAG query + advisor router with deps closed over."""
 
     def query(request: RAGQueryRequest) -> JSONResponse:
         """Answer one documentation question with cited sources."""
         try:
-            chunks = retrieve(rag_store, llm, config, request.tenant, request.question)
+            turns = (
+                rag_recent_turns(memory, request.tenant, request.sessionId)
+                if memory is not None
+                else []
+            )
+            chunks = retrieve(rag_store, llm, config, request.tenant, request.question, turns)
         except Exception as exc:  # noqa: BLE001 (boundary: store outage -> typed 503)
             _logger.warning("rag store unavailable: %s", exc)
             return _failure(503, "RAG_STORE_UNAVAILABLE", str(exc).splitlines()[0])

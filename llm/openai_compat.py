@@ -83,6 +83,14 @@ def _client(base_url: str, api_key: str) -> httpx2.Client:
     )
 
 
+def embed_body(settings: Settings, texts: Sequence[str]) -> dict[str, object]:
+    """Embeddings request body; `dimensions` only when configured."""
+    body: dict[str, object] = {"model": settings.embedding_model, "input": list(texts)}
+    if settings.embedding_dimensions is not None:
+        body["dimensions"] = settings.embedding_dimensions
+    return body
+
+
 class OpenAICompatibleClient:
     """Sync client for any OpenAI-compatible /chat/completions + /embeddings."""
 
@@ -115,7 +123,7 @@ class OpenAICompatibleClient:
 
     def embed(self, texts: Sequence[str]) -> list[list[float]]:
         """One embedding vector per input text."""
-        body: dict[str, object] = {"model": self.settings.embedding_model, "input": list(texts)}
+        body = embed_body(self.settings, texts)
         try:
             payload = _EmbeddingsPayload.model_validate_json(self._post("/embeddings", body))
         except ValidationError as exc:
@@ -124,6 +132,14 @@ class OpenAICompatibleClient:
         vectors = [item.embedding for item in payload.data]
         if len(vectors) != len(texts):
             detail = f"expected {len(texts)} embeddings, got {len(vectors)}"
+            raise LLMError(detail)
+        expected = self.settings.embedding_dimensions
+        if expected is not None and vectors and len(vectors[0]) != expected:
+            detail = (
+                f"embedding model {self.settings.embedding_model!r} returned "
+                f"{len(vectors[0])}-dim vectors, expected {expected} "
+                f"(the endpoint may not honor the dimensions parameter)"
+            )
             raise LLMError(detail)
         return vectors
 

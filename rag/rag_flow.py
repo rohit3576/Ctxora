@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections.abc import Sequence
 from typing import Final
 
 from pydantic import TypeAdapter
@@ -9,6 +10,7 @@ from pydantic import TypeAdapter
 from config.settings import RagConfig
 from llm.client import LLMClient
 from rag.contracts import RagStore, RetrievedChunk
+from rag.rewrite import rewrite_query
 
 _logger = logging.getLogger("ctxora.rag")
 
@@ -30,10 +32,22 @@ class UngroundedError(Exception):
 
 
 def retrieve(
-    store: RagStore, llm: LLMClient, config: RagConfig, tenant: str, question: str
+    store: RagStore,
+    llm: LLMClient,
+    config: RagConfig,
+    tenant: str,
+    question: str,
+    recent_turns: Sequence[str] = (),
 ) -> list[RetrievedChunk]:
-    """Embed the question and search tenant + shared scopes."""
-    query_embedding = llm.embed([question])[0]
+    """Embed the (session-rewritten when enabled) question and search scopes.
+
+    Rewrite fires only when the flag is on AND turns exist: the stateless
+    path never pays an extra LLM call.
+    """
+    query = question
+    if config.query_rewrite and recent_turns:
+        query = rewrite_query(llm, question, recent_turns[-config.rewrite_history_turns :])
+    query_embedding = llm.embed([query])[0]
     return store.search(query_embedding, tenant, config.shared_scope, config.top_k)
 
 
