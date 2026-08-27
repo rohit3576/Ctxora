@@ -44,6 +44,7 @@ agent:
     - voltage
     - location
   digest_turn_threshold: 10
+  repair_passes: 3                 # S1: AST repair loop bound (repair_v2)
 
 rag:
   chunk_size: 800
@@ -74,6 +75,7 @@ flags:
   ratelimit: false
   followup: false
   greeting: false
+  repair_v2: true                  # S1: AST repair taxonomy (false = single regex pass)
 
 routing:
   sql_indicators:

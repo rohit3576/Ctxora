@@ -223,7 +223,11 @@ def _run_sql_flow(
 
     observe(STAGE_VALIDATING)
     validator = SQLValidator(
-        dialect=deps.store.dialect, mapping=mapping, allowed_tables=tuple(allowed_tables)
+        dialect=deps.store.dialect,
+        mapping=mapping,
+        allowed_tables=tuple(allowed_tables),
+        repair_v2=deps.config.flags.repair_v2,
+        repair_passes=deps.config.agent.repair_passes,
     )
     validation = validator.validate(generated.sql)
     if not validation.valid:

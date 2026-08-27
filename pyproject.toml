@@ -177,6 +177,7 @@ fixable = ["ALL"]
     "PLC0415",  # fixture-local imports keep setup next to use
     "PT018",    # compound assertions document multi-part expectations
     "PLR0912",  # scripted executors branch per query by design
+    "S608",     # test SQL builders assemble literal fixtures, not queries
 ]
 "api/query.py" = [
     "N815",     # camelCase fields are the public wire contract

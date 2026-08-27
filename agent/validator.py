@@ -1,4 +1,4 @@
-"""SQL validator: sqlglot-AST read-only rules + one repair pass.
+"""SQL validator: sqlglot-AST read-only rules + bounded repair passes.
 
 Layer 1 (hard rejects, fail-closed, in order): parse with the engine's
 sqlglot dialect (tokenizer and parser errors both reject), single
@@ -8,8 +8,10 @@ Drop/Alter/Create/Into/Lock plus best-effort admin nodes), dangerous-
 function deny (short named list with last-segment matching; FROM/JOIN
 targets must be plain identifier tables), CTE-aware table allowlist
 (qualified names are never allowed), CTE depth <= 5.
-Layer 2 (auto-repair): bare aggregates over the EAV value column get the
-dialect's null-safe numeric cast, once, then re-validate.
+Layer 2 (auto-repair): with repair_v2 off, the single regex value-cast
+pass (v1 behavior, byte-identical). With repair_v2 on, the bounded AST
+transform taxonomy from agent/repairs.py — one class per pass, stop at
+the first clean re-validation, revert on a broken transform.
 """
 
 import re
@@ -20,6 +22,7 @@ import sqlglot
 from sqlglot import errors as sqerr
 from sqlglot import exp
 
+from agent.repairs import run_repair_loop
 from config.settings import ColumnMapping
 from database.contracts import Dialect
 
@@ -82,23 +85,45 @@ class SQLValidator:
     """Validate generated SQL against safety rules before execution."""
 
     def __init__(
-        self, dialect: Dialect, mapping: ColumnMapping, allowed_tables: tuple[str, ...]
+        self,
+        dialect: Dialect,
+        mapping: ColumnMapping,
+        allowed_tables: tuple[str, ...],
+        repair_v2: bool = False,
+        repair_passes: int = 1,
     ) -> None:
-        """Bind dialect, column mapping, and the tenant's table allowlist."""
+        """Bind dialect, column mapping, table allowlist, and repair mode."""
         self.dialect: Dialect = dialect
         self.mapping: ColumnMapping = mapping
         self.allowed_tables: tuple[str, ...] = allowed_tables
+        self.repair_v2: bool = repair_v2
+        self.repair_passes: int = repair_passes
 
     def validate(self, sql: str) -> ValidationResult:
-        """Run hard rules, then one repair pass, then re-run hard rules."""
-        repaired = self._repair_value_casts(sql)
-        repairs = [] if repaired == sql.strip() else ["value-cast"]
-        errors = self._hard_errors(repaired)
+        """Run hard rules, then repairs, then hard rules again."""
+        if not self.repair_v2:
+            repaired = self._repair_value_casts(sql)
+            repairs = [] if repaired == sql.strip() else ["value-cast"]
+            errors = self._hard_errors(repaired)
+            return ValidationResult(
+                valid=not errors,
+                errors=tuple(errors),
+                normalized_sql=repaired,
+                repairs_applied=tuple(repairs),
+            )
+        looped = run_repair_loop(
+            sql,
+            self.dialect,
+            self.mapping,
+            self.repair_passes,
+            self._hard_errors,
+        )
+        errors = self._hard_errors(looped.sql)
         return ValidationResult(
             valid=not errors,
             errors=tuple(errors),
-            normalized_sql=repaired,
-            repairs_applied=tuple(repairs),
+            normalized_sql=looped.sql,
+            repairs_applied=looped.repairs_applied,
         )
 
     def _hard_errors(self, sql: str) -> list[str]:

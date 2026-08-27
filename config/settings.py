@@ -176,6 +176,7 @@ class AgentConfig(BaseModel):
     query_timeout_s: int = 30
     aggregation_defaults: dict[str, str] = {"*": "average"}
     digest_turn_threshold: int = 10
+    repair_passes: int = 1
     title_keywords: tuple[str, ...] = (
         "speed",
         "rpm",
@@ -229,6 +230,7 @@ class Flags(BaseModel):
     followup: bool = False
     greeting: bool = False
     ratelimit: bool = False
+    repair_v2: bool = False
 
 
 class RoutingConfig(BaseModel):

@@ -251,3 +251,90 @@ class TestLockClauses:
 
         assert isinstance(root, exp.Select)
         assert any(isinstance(node, exp.Lock) for node in root.find_all(exp.Lock))
+
+
+# --- (m) S1 repair-loop transforms ---
+
+
+class TestRepairTransformBehaviors:
+    def test_median_node_exists_and_avg_arg_is_column(self) -> None:
+        """Observed: avg(value) parses with exp.Avg whose `this` is a bare
+        exp.Column (name 'value', empty table) — REQUIRED by the value-cast
+        repair's trigger shape; exp.Median exists in 27.x."""
+        ast = sqlglot.parse_one("SELECT avg(value) FROM t", read="clickhouse")
+
+        assert hasattr(exp, "Median")
+        agg = next(ast.find_all(exp.Avg))
+        assert isinstance(agg.this, exp.Column)
+        assert agg.this.name == "value"
+        assert agg.this.table == ""
+
+    def test_setting_agg_this_regenerates_with_replacement(self) -> None:
+        """Observed: aggregate.set('this', parsed_cast) yields the cast inside
+        the aggregate on regenerate — the value-cast transform's mechanism."""
+        ast = sqlglot.parse_one("SELECT avg(value) FROM t", read="clickhouse")
+        cast = sqlglot.parse_one("toFloat64OrNull(value)", read="clickhouse")
+
+        next(ast.find_all(exp.Avg)).set("this", cast)
+
+        assert ast.sql(dialect="clickhouse") == "SELECT avg(toFloat64OrNull(value)) FROM t"
+
+    def test_quoted_identifier_column_keeps_bare_name(self) -> None:
+        """Observed: avg("value") parses with Column.name == 'value' and empty
+        table — REQUIRED: the v1 regex missed quoted identifiers; the AST
+        trigger must catch them."""
+        ast = sqlglot.parse_one('SELECT avg("value") FROM t', read="postgres")
+        agg = next(ast.find_all(exp.Avg))
+
+        assert agg.this.name == "value"
+        assert agg.this.table == ""
+
+    @pytest.mark.parametrize("dialect", ["clickhouse", "postgres"])
+    def test_limit_set_renders_limit_n(self, dialect: str) -> None:
+        """Observed: Select.set('limit', Limit(Literal.number(1000))) renders
+        'LIMIT 1000' in both engine dialects — the add-limit transform."""
+        ast = sqlglot.parse_one("SELECT value FROM demo_telemetry", read=dialect)
+        ast.set("limit", exp.Limit(expression=exp.Literal.number(1000)))
+
+        assert ast.sql(dialect=dialect).endswith("LIMIT 1000")
+
+    def test_trailing_semicolon_is_single_statement(self) -> None:
+        """Observed: parse('SELECT 1 FROM t;') yields exactly one statement —
+        REQUIRED: strip-junk may regenerate single-statement input with a
+        trailing semicolon, but must not touch multi-statement input (that
+        is a hard reject, never a repair)."""
+        statements = sqlglot.parse("SELECT 1 FROM t;", read="postgres")
+
+        assert len(statements) == 1
+        assert isinstance(statements[0], exp.Select)
+
+    def test_regenerate_drops_comments(self) -> None:
+        """Observed: .sql(comments=False) drops both -- and /* */ comments —
+        the strip-junk transform's output contract."""
+        ast = sqlglot.parse_one("SELECT 1 FROM t -- note\n/* blk */", read="postgres")
+
+        assert "--" not in ast.sql(comments=False)
+        assert "/*" not in ast.sql(comments=False)
+
+    def test_cte_inline_via_table_replace_and_list_removal(self) -> None:
+        """Observed: replacing a CTE-name Table ref with Subquery(this=body)
+        and removing the CTE from with.expressions inlines it exactly — the
+        inline-cte-depth transform's mechanism; with.recursive is readable
+        (False here) so recursive WITH can be skipped."""
+        ast = sqlglot.parse_one(
+            "WITH a AS (SELECT 1 AS x), b AS (SELECT x FROM a) SELECT * FROM b",
+            read="postgres",
+        )
+        with_node = ast.args["with"]
+        assert with_node.recursive is False
+
+        deepest = with_node.expressions[-1]
+        body = deepest.this
+        for table in list(ast.find_all(exp.Table)):
+            if table.name == "b" and not table.db:
+                table.replace(exp.Subquery(this=body.copy()))
+        with_node.expressions.remove(deepest)
+
+        assert ast.sql(dialect="postgres") == (
+            "WITH a AS (SELECT 1 AS x) SELECT * FROM (SELECT x FROM a)"
+        )
