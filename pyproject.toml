@@ -215,6 +215,13 @@ fixable = ["ALL"]
     "PLR0913",  # save_document carries the full ingest tuple by interface contract
     "PLR0917",  # same
 ]
+"feedback/similarity.py" = [
+    "PLR0911",  # shape walk returns one structural key per node class
+]
+"feedback/promotion.py" = [
+    "PLR0913",  # approve carries the full promotion contract
+    "PLR0917",  # same
+]
 "agent/validator.py" = [
     "PLR0913",  # validator carries the full gate configuration by interface contract
     "PLR0917",  # same

@@ -116,6 +116,7 @@ def create_app(
                 resolved_llm,
                 resolved_settings.feedback_admin_token,
                 resolved_settings.embedding_model,
+                structural=app_config.flags.structural_similarity,
             )
         )
     if app_config.flags.streaming:

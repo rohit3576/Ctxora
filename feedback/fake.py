@@ -31,6 +31,7 @@ class InMemoryFeedbackStore:
             user_comment=row.user_comment,
             corrected_sql=row.corrected_sql,
             created_at=datetime.datetime.now(tz=datetime.UTC),
+            correction_delta=dict(row.correction_delta) if row.correction_delta else None,
         )
         return feedback_id
 

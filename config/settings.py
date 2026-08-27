@@ -233,6 +233,7 @@ class Flags(BaseModel):
     ratelimit: bool = False
     repair_v2: bool = False
     qualify: bool = False
+    structural_similarity: bool = False
 
 
 class RoutingConfig(BaseModel):

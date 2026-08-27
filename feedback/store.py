@@ -1,6 +1,8 @@
 """PostgreSQL FeedbackStore over an injected query executor."""
 
 import datetime
+import json
+from typing import cast
 
 from feedback.contracts import (
     FeedbackInsert,
@@ -25,6 +27,16 @@ def _opt_int(value: object) -> int | None:
     return None
 
 
+def _delta_of(value: object) -> dict[str, list[str]] | None:
+    """Narrow a JSONB cell to the labeled-delta map."""
+    if not isinstance(value, dict):
+        return None
+    cell: dict[str, list[str]] = {}
+    for key, items in cast("dict[str, list[str]]", value).items():
+        cell[str(key)] = [str(item) for item in items]
+    return cell or None
+
+
 def _row_of(row: tuple[object, ...]) -> FeedbackRow:
     """Shape one SELECT row into a FeedbackRow."""
     status = _text(row[5])
@@ -41,12 +53,14 @@ def _row_of(row: tuple[object, ...]) -> FeedbackRow:
         corrected_sql=_text(row[9]) or None,
         reviewed_by=_text(row[10]) or None,
         created_at=row[11] if isinstance(row[11], datetime.datetime) else None,
+        correction_delta=_delta_of(row[12]) if len(row) > 12 else None,
     )
 
 
 _SELECT_COLUMNS = (
     "id, tenant, nl_query, generated_sql, feedback_type, status, "
-    "session_id, history_id, user_comment, corrected_sql, reviewed_by, created_at"
+    "session_id, history_id, user_comment, corrected_sql, reviewed_by, created_at, "
+    "correction_delta"
 )
 
 
@@ -62,8 +76,8 @@ class PGFeedbackStore:
         rows = self._query(
             "INSERT INTO query_feedback "
             "(tenant, session_id, history_id, nl_query, generated_sql, feedback_type, "
-            "user_comment, corrected_sql, status) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "user_comment, corrected_sql, status, correction_delta) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb) RETURNING id",
             (
                 row.tenant,
                 row.session_id,
@@ -74,6 +88,7 @@ class PGFeedbackStore:
                 row.user_comment,
                 row.corrected_sql,
                 row.status,
+                json.dumps(row.correction_delta) if row.correction_delta else None,
             ),
         )
         return _opt_int(rows[0][0]) or 0

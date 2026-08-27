@@ -38,6 +38,7 @@ class FeedbackRowView(BaseModel):
     status: str
     userComment: str | None = None
     correctedSql: str | None = None
+    correctionDelta: dict[str, list[str]] | None = None
 
 
 def _forbidden() -> JSONResponse:
@@ -60,7 +61,11 @@ def _unavailable(exc: BaseException) -> JSONResponse:
 
 
 def build_feedback_admin_router(
-    feedback: FeedbackStore, llm: LLMClient, admin_token: str | None, embedding_model: str
+    feedback: FeedbackStore,
+    llm: LLMClient,
+    admin_token: str | None,
+    embedding_model: str,
+    structural: bool = False,
 ) -> APIRouter:
     """Build the token-gated review router; unset token means always 403."""
     router = APIRouter(tags=["feedback-admin"])
@@ -107,6 +112,7 @@ def build_feedback_admin_router(
                 status=row.status,
                 userComment=row.user_comment,
                 correctedSql=row.corrected_sql,
+                correctionDelta=row.correction_delta,
             )
             for row in rows
         ]
@@ -138,7 +144,9 @@ def build_feedback_admin_router(
         blocked = guarded(x_admin_token)
         if blocked is not None:
             return blocked
-        result = approve(feedback, llm, embedding_model, feedback_id, action.reviewer)
+        result = approve(
+            feedback, llm, embedding_model, feedback_id, action.reviewer, structural=structural
+        )
         status_code = 200 if result.approved else 409
         message = result.action if result.approved else f"not approved: {result.action}"
         envelope = Envelope[dict[str, object]](
@@ -180,7 +188,9 @@ def build_feedback_admin_router(
         blocked = guarded(x_admin_token)
         if blocked is not None:
             return blocked
-        promoted = auto_promote_positive(feedback, llm, embedding_model, action.reviewer)
+        promoted = auto_promote_positive(
+            feedback, llm, embedding_model, action.reviewer, structural=structural
+        )
         envelope = Envelope[dict[str, int]](
             status="Success", message="batch promotion complete", data={"promoted": promoted}
         )

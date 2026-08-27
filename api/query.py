@@ -214,6 +214,7 @@ def _mine_correction(
             outcome,
             previous_sql=previous_sql,
             history_id=history_id,
+            structural=deps.config.flags.structural_similarity,
         )
     except Exception as exc:  # noqa: BLE001 (boundary: mining must never break answering)
         _logger.warning("correction mining failed (non-blocking): %s", exc)

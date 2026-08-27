@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from typing import Final
 
 from feedback.contracts import FeedbackStatus, FeedbackStore
-from feedback.hooks import invalidate_knowledge, normalize_sql
+from feedback.hooks import invalidate_knowledge
+from feedback.normalize import normalize_sql
+from feedback.similarity import similar
 from llm.client import LLMClient
 
 _logger = logging.getLogger("ctxora.promotion")
@@ -34,9 +36,19 @@ class RejectResult:
 
 
 def approve(
-    feedback: FeedbackStore, llm: LLMClient, embedding_model: str, feedback_id: int, reviewer: str
+    feedback: FeedbackStore,
+    llm: LLMClient,
+    embedding_model: str,
+    feedback_id: int,
+    reviewer: str,
+    structural: bool = False,
 ) -> ApproveResult:
-    """Approve one signal and promote its pair into the example table."""
+    """Approve one signal and promote its pair into the example table.
+
+    structural=True skips promotion when an approved example with the same
+    SQL shape already exists (alias-renamed / reordered duplicates never
+    enter the example table twice).
+    """
     row = feedback.get(feedback_id)
     if row is None or row.status not in _PROMOTABLE:
         return ApproveResult(
@@ -47,6 +59,22 @@ def approve(
         )
 
     sql_to_promote = row.corrected_sql or row.generated_sql
+    if structural:
+        for example_id, example_sql in feedback.approved_example_sqls(row.tenant):
+            if similar(example_sql, sql_to_promote):
+                feedback.set_status(feedback_id, "approved", reviewed_by=reviewer)
+                _logger.info(
+                    "feedback %s approved but not promoted: structural duplicate of example %s",
+                    feedback_id,
+                    example_id,
+                )
+                return ApproveResult(
+                    approved=True,
+                    promoted=False,
+                    action=f"structural duplicate of example {example_id}",
+                    feedback_id=feedback_id,
+                    example_tenant=row.tenant,
+                )
     embedding = llm.embed([row.nl_query])[0]
     feedback.upsert_approved_example(
         tenant=row.tenant,
@@ -80,7 +108,11 @@ def reject(feedback: FeedbackStore, feedback_id: int, reviewer: str) -> RejectRe
 
 
 def auto_promote_positive(
-    feedback: FeedbackStore, llm: LLMClient, embedding_model: str, reviewer: str
+    feedback: FeedbackStore,
+    llm: LLMClient,
+    embedding_model: str,
+    reviewer: str,
+    structural: bool = False,
 ) -> int:
     """Batch-approve every pending positive signal; returns promoted count."""
     pending = feedback.list_by_status(("pending",))
@@ -88,18 +120,19 @@ def auto_promote_positive(
     for row in pending:
         if row.feedback_type != "positive":
             continue
-        result = approve(feedback, llm, embedding_model, row.id, reviewer)
+        result = approve(feedback, llm, embedding_model, row.id, reviewer, structural=structural)
         if result.approved:
             promoted += 1
     return promoted
 
 
-def decay_matches(feedback: FeedbackStore, tenant: str, sql: str) -> int:
+def decay_matches(feedback: FeedbackStore, tenant: str, sql: str, structural: bool = False) -> int:
     """Demote approved examples whose SQL matches; returns demoted count."""
     target = normalize_sql(sql)
     demoted = 0
     for example_id, example_sql in feedback.approved_example_sqls(tenant):
-        if normalize_sql(example_sql) == target:
+        matched = normalize_sql(example_sql) == target or (structural and similar(example_sql, sql))
+        if matched:
             feedback.demote_example(example_id)
             demoted += 1
     return demoted

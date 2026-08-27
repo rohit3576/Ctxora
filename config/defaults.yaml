@@ -78,6 +78,7 @@ flags:
   greeting: false
   repair_v2: true                  # S1: AST repair taxonomy (false = single regex pass)
   qualify: true                    # S2: qualified gauntlet — exact scope-walk table checks
+  structural_similarity: true      # S3: shape-based flywheel dedupe/decay
 
 routing:
   sql_indicators:

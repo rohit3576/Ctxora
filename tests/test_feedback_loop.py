@@ -256,3 +256,188 @@ class TestCaptureIsolation:
 
         with pytest.raises(HistoryNotFoundError):
             capture(InMemoryFeedbackStore(), memory, 999, "up")
+
+
+class TestStructuralSimilarity:
+    def test_alias_rename_and_column_reorder_collapse(self) -> None:
+        from feedback.similarity import similar, structural_signature
+
+        a = "SELECT t.key, avg(t.value) FROM demo_telemetry t WHERE t.key = 'rpm' GROUP BY t.key"
+        b = "SELECT avg(x.value), x.key FROM demo_telemetry AS x WHERE x.key = 'rpm' GROUP BY x.key"
+
+        assert structural_signature(a) == structural_signature(b)
+        assert similar(a, b)
+
+    def test_literal_or_aggregate_changes_stay_different(self) -> None:
+        from feedback.similarity import similar
+
+        base = "SELECT key, avg(value) FROM demo_telemetry WHERE key = 'rpm'"
+        assert not similar(base, "SELECT key, avg(value) FROM demo_telemetry WHERE key = 'oil'")
+        assert not similar(base, "SELECT key, max(value) FROM demo_telemetry WHERE key = 'rpm'")
+
+    def test_unparseable_never_matches_parseable(self) -> None:
+        from feedback.similarity import similar
+
+        assert not similar("SELECT 1 FROM demo_telemetry", "GARBAGE $$$")
+
+    def test_correction_delta_labels_roles(self) -> None:
+        from feedback.similarity import correction_delta
+
+        delta = correction_delta(
+            "SELECT key, avg(value) FROM demo_telemetry WHERE key = 'rpm'",
+            "SELECT key, max(value) FROM demo_telemetry "
+            "WHERE key = 'rpm' AND timestamp >= now() - INTERVAL 1 DAY",
+        )
+
+        assert delta["aggregation_changes"] == ["Avg -> Max"]
+        assert len(delta["added_time_windows"]) == 1
+        assert "timestamp" in delta["added_time_windows"][0]
+
+    def test_correction_delta_column_and_filter_changes(self) -> None:
+        from feedback.similarity import correction_delta
+
+        delta = correction_delta(
+            "SELECT key FROM demo_telemetry WHERE key = 'a'",
+            "SELECT key, device_id FROM demo_telemetry WHERE key = 'a' AND key = 'b'",
+        )
+
+        assert delta["added_columns"] == ["device_id"]
+        assert delta["added_filters"] == ['"demo_telemetry"."key" = \'b\'']
+
+    def test_correction_delta_unparseable_is_empty(self) -> None:
+        from feedback.similarity import correction_delta
+
+        assert correction_delta("GARBAGE $$$", "SELECT 1") == {}
+        assert correction_delta("SELECT 1", "GARBAGE $$$") == {}
+
+
+class TestStructuralDecay:
+    def test_correction_decays_structurally_identical_example(self) -> None:
+        feedback = InMemoryFeedbackStore()
+        feedback.upsert_approved_example(
+            "demo",
+            "avg rpm question",
+            "SELECT t.key, avg(t.value) FROM demo_telemetry t GROUP BY t.key",
+            [0.5, 0.5],
+            0,
+            "embed-m",
+        )
+        promoted = next(iter(feedback.examples))
+
+        corrected = "SELECT x.key, avg(x.value) FROM demo_telemetry x GROUP BY x.key"
+        after_correction(
+            feedback,
+            "demo",
+            "avg rpm question",
+            success(sql=corrected),
+            previous_sql=corrected,
+            history_id=7,
+            structural=True,
+        )
+
+        assert feedback.examples[promoted]["status"] == "review"
+
+
+class TestStructuralPromotionDedupe:
+    def test_alias_renamed_duplicate_rejected_at_promote_time(self) -> None:
+        feedback = InMemoryFeedbackStore()
+        first = feedback.insert(
+            FeedbackInsert(
+                tenant="demo",
+                nl_query="average rpm?",
+                generated_sql="SELECT t.key, avg(t.value) FROM demo_telemetry t GROUP BY t.key",
+                feedback_type="positive",
+                status="pending",
+            )
+        )
+        approved = approve(feedback, EmbeddingLLM(), "embed-m", first, "admin")
+        assert approved.promoted
+
+        second = feedback.insert(
+            FeedbackInsert(
+                tenant="demo",
+                nl_query="mean rpm per key?",
+                generated_sql=(
+                    "SELECT x.key, avg(x.value) FROM demo_telemetry AS x GROUP BY x.key"
+                ),
+                feedback_type="positive",
+                status="pending",
+            )
+        )
+        duplicate = approve(feedback, EmbeddingLLM(), "embed-m", second, "admin", structural=True)
+
+        assert duplicate.approved
+        assert not duplicate.promoted
+        assert "structural duplicate" in duplicate.action
+        examples = feedback.approved_example_sqls("demo")
+        assert len(examples) == 1
+
+    def test_structural_off_promotes_duplicates_as_before(self) -> None:
+        feedback = InMemoryFeedbackStore()
+        first = feedback.insert(
+            FeedbackInsert(
+                tenant="demo",
+                nl_query="average rpm?",
+                generated_sql="SELECT t.key, avg(t.value) FROM demo_telemetry t GROUP BY t.key",
+                feedback_type="positive",
+                status="pending",
+            )
+        )
+        approve(feedback, EmbeddingLLM(), "embed-m", first, "admin")
+        second = feedback.insert(
+            FeedbackInsert(
+                tenant="demo",
+                nl_query="mean rpm per key?",
+                generated_sql=(
+                    "SELECT x.key, avg(x.value) FROM demo_telemetry AS x GROUP BY x.key"
+                ),
+                feedback_type="positive",
+                status="pending",
+            )
+        )
+        result = approve(feedback, EmbeddingLLM(), "embed-m", second, "admin")
+
+        assert result.promoted
+        assert len(feedback.approved_example_sqls("demo")) == 2
+
+
+class TestDeltaMiningNonBlocking:
+    def test_sabotaged_diff_path_never_breaks_mining(self, monkeypatch: pytest.MonkeyPatch) -> None:
+
+        def _boom(previous: str, corrected: str) -> dict[str, list[str]]:
+            raise RuntimeError("diff exploded")
+
+        import feedback.hooks as feedback_hooks
+
+        monkeypatch.setattr(feedback_hooks, "correction_delta", _boom)
+        feedback = InMemoryFeedbackStore()
+
+        after_correction(
+            feedback,
+            "demo",
+            "average rpm?",
+            success(sql="SELECT key FROM demo_telemetry"),
+            previous_sql="SELECT key, value FROM demo_telemetry",
+            history_id=9,
+            structural=True,
+        )
+
+        rows = feedback.list_by_status(("auto_pending",))
+        assert len(rows) == 1
+        assert rows[0].correction_delta is None
+
+    def test_mined_delta_persisted_on_row(self) -> None:
+        feedback = InMemoryFeedbackStore()
+        after_correction(
+            feedback,
+            "demo",
+            "average rpm?",
+            success(sql="SELECT key, max(value) FROM demo_telemetry WHERE key = 'rpm'"),
+            previous_sql="SELECT key, avg(value) FROM demo_telemetry WHERE key = 'rpm'",
+            history_id=11,
+            structural=True,
+        )
+
+        (row,) = feedback.list_by_status(("auto_pending",))
+        assert row.correction_delta is not None
+        assert row.correction_delta["aggregation_changes"] == ["Avg -> Max"]

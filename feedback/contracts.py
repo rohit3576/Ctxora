@@ -21,6 +21,7 @@ class FeedbackInsert:
     user_comment: str | None = None
     corrected_sql: str | None = None
     status: FeedbackStatus = "pending"
+    correction_delta: dict[str, list[str]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +40,7 @@ class FeedbackRow:
     corrected_sql: str | None = None
     reviewed_by: str | None = None
     created_at: datetime.datetime | None = None
+    correction_delta: dict[str, list[str]] | None = None
 
 
 @dataclass(frozen=True, slots=True)

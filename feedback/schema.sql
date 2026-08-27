@@ -16,8 +16,12 @@ CREATE TABLE IF NOT EXISTS query_feedback (
     status VARCHAR(20) DEFAULT 'pending',
     reviewed_by VARCHAR(255),
     reviewed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    correction_delta JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_query_feedback_status ON query_feedback(status);
 CREATE INDEX IF NOT EXISTS idx_query_feedback_tenant ON query_feedback(tenant);
+
+-- S3 (structural flywheel): labeled correction deltas, additive.
+ALTER TABLE query_feedback ADD COLUMN IF NOT EXISTS correction_delta JSONB;
