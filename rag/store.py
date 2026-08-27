@@ -16,7 +16,7 @@ _CHILD_SEARCH_SQL = (
     "JOIN rag_chunks p ON p.id = c.parent_id "
     "JOIN rag_documents d ON d.id = p.document_id "
     "WHERE (c.tenant = %s OR (c.tenant IS DISTINCT FROM %s AND c.scope = %s)) "
-    "AND c.chunk_kind = %s "
+    "AND c.chunk_kind = %s AND d.status = 'ACTIVE' "
     "GROUP BY p.id, d.filename, p.page_number, p.section_title, p.chunk_text "
     "ORDER BY score DESC LIMIT %s"
 )
@@ -26,7 +26,7 @@ _LEGACY_SEARCH_SQL = (
     "1 - (c.embedding <=> %s::vector) AS score "
     "FROM rag_chunks c JOIN rag_documents d ON d.id = c.document_id "
     "WHERE (c.tenant = %s OR (c.tenant IS DISTINCT FROM %s AND c.scope = %s)) "
-    "AND c.chunk_kind IS NULL "
+    "AND c.chunk_kind IS NULL AND d.status = 'ACTIVE' "
     "ORDER BY c.embedding <=> %s::vector LIMIT %s"
 )
 
@@ -54,6 +54,20 @@ def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(str(value) for value in embedding) + "]"
 
 
+_FIND_BY_HASH_SQL = (
+    "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, "
+    "created_at, doc_family, doc_version, status "
+    "FROM rag_documents WHERE tenant = %s AND file_hash = %s"
+)
+
+_LIST_DOCUMENTS_SQL = (
+    "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, "
+    "created_at, doc_family, doc_version, status "
+    "FROM rag_documents WHERE tenant = %s AND status = 'ACTIVE' "
+    "ORDER BY created_at DESC"
+)
+
+
 class PGRagStore:
     """rag_documents + rag_chunks in PostgreSQL with pgvector."""
 
@@ -70,28 +84,49 @@ class PGRagStore:
         total_pages: int,
         embedding_model: str,
         scope: str | None = None,
+        doc_family: str | None = None,
+        doc_version: str | None = None,
+        supersede_ids: tuple[str, ...] = (),
+        status: str = "ACTIVE",
     ) -> DocumentRecord | None:
         """Persist document + chunks; None when the hash already exists."""
         if self.find_by_hash(tenant, file_hash) is not None:
             return None
         document_id = str(uuid.uuid4())
         created = datetime.datetime.now(tz=datetime.UTC)
-        self._query(
-            "INSERT INTO rag_documents "
-            "(id, tenant, filename, file_hash, total_pages, chunk_count, "
-            "status, embedding_model, created_at) "
-            "VALUES (%s,%s,%s,%s,%s,%s,'ACTIVE',%s,%s)",
-            (
-                document_id,
-                tenant,
-                filename,
-                file_hash,
-                total_pages,
-                len(chunks),
-                embedding_model,
-                created,
-            ),
+        insert_values = (
+            document_id,
+            tenant,
+            filename,
+            file_hash,
+            total_pages,
+            len(chunks),
+            status,
+            embedding_model,
+            doc_family,
+            doc_version,
+            created,
         )
+        if supersede_ids:
+            self._query(
+                "WITH supersede AS ("
+                "UPDATE rag_documents SET status = 'SUPERSEDED' "
+                "WHERE tenant = %s AND id = ANY(%s) RETURNING id) "
+                "INSERT INTO rag_documents "
+                "(id, tenant, filename, file_hash, total_pages, chunk_count, "
+                "status, embedding_model, doc_family, doc_version, created_at) "
+                "SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                " FROM (SELECT count(*) FROM supersede) AS one",
+                (tenant, list(supersede_ids), *insert_values),
+            )
+        else:
+            self._query(
+                "INSERT INTO rag_documents "
+                "(id, tenant, filename, file_hash, total_pages, chunk_count, "
+                "status, embedding_model, doc_family, doc_version, created_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                insert_values,
+            )
         parents = [chunk for chunk in chunks if chunk.chunk_kind == PARENT_KIND]
         children = [chunk for chunk in chunks if chunk.chunk_kind == CHILD_KIND]
         parent_ids = {chunk.chunk_hash: str(uuid.uuid4()) for chunk in parents}
@@ -117,6 +152,9 @@ class PGRagStore:
             total_pages=total_pages,
             chunk_count=len(chunks),
             created_at=created,
+            doc_family=doc_family,
+            doc_version=doc_version,
+            status=status,
         )
 
     def _insert_chunk(
@@ -153,21 +191,12 @@ class PGRagStore:
 
     def find_by_hash(self, tenant: str, file_hash: str) -> DocumentRecord | None:
         """Look up one document by tenant + content hash."""
-        rows = self._query(
-            "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, created_at "
-            "FROM rag_documents WHERE tenant = %s AND file_hash = %s",
-            (tenant, file_hash),
-        )
+        rows = self._query(_FIND_BY_HASH_SQL, (tenant, file_hash))
         return self._record(rows[0]) if rows else None
 
     def list_documents(self, tenant: str) -> list[DocumentRecord]:
         """Active documents for one tenant, newest first."""
-        rows = self._query(
-            "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, created_at "
-            "FROM rag_documents WHERE tenant = %s AND status = 'ACTIVE' "
-            "ORDER BY created_at DESC",
-            (tenant,),
-        )
+        rows = self._query(_LIST_DOCUMENTS_SQL, (tenant,))
         return [self._record(row) for row in rows]
 
     def delete_document(self, tenant: str, document_id: str) -> bool:
@@ -247,4 +276,7 @@ class PGRagStore:
             total_pages=_int(row[4]),
             chunk_count=_int(row[5]),
             created_at=row[6] if isinstance(row[6], datetime.datetime) else None,
+            doc_family=_text(row[7]) or None,
+            doc_version=_text(row[8]) or None,
+            status=_text(row[9]) or "ACTIVE",
         )

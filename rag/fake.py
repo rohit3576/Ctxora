@@ -5,6 +5,7 @@ import hashlib
 import math
 import re
 from collections.abc import Sequence
+from dataclasses import replace
 from itertools import chain
 
 from llm.client import GenResult
@@ -92,11 +93,19 @@ class InMemoryRagStore:
         total_pages: int,
         embedding_model: str,
         scope: str | None = None,
+        doc_family: str | None = None,
+        doc_version: str | None = None,
+        supersede_ids: tuple[str, ...] = (),
+        status: str = "ACTIVE",
     ) -> DocumentRecord | None:
         """Persist document + chunks; None when the hash already exists."""
         if self.find_by_hash(tenant, file_hash) is not None:
             return None
         document_id = f"doc-{len(self.documents) + 1}"
+        for superseded_id in supersede_ids:
+            old = self.documents.get(superseded_id)
+            if old is not None and old.tenant == tenant:
+                self.documents[superseded_id] = replace(old, status="SUPERSEDED")
         record = DocumentRecord(
             id=document_id,
             tenant=tenant,
@@ -105,6 +114,9 @@ class InMemoryRagStore:
             total_pages=total_pages,
             chunk_count=len(chunks),
             created_at=datetime.datetime.now(tz=datetime.UTC),
+            doc_family=doc_family,
+            doc_version=doc_version,
+            status=status,
         )
         self.documents[document_id] = record
         self.chunks[document_id] = [(chunk, scope, tenant) for chunk in chunks]
@@ -120,7 +132,9 @@ class InMemoryRagStore:
 
     def list_documents(self, tenant: str) -> list[DocumentRecord]:
         """Active documents for one tenant, newest first."""
-        records = [r for r in self.documents.values() if r.tenant == tenant]
+        records = [
+            r for r in self.documents.values() if r.tenant == tenant and r.status == "ACTIVE"
+        ]
         records.sort(
             key=lambda r: r.created_at or datetime.datetime.min.replace(tzinfo=datetime.UTC),
             reverse=True,
@@ -158,53 +172,66 @@ class InMemoryRagStore:
         legacy: list[tuple[float, RetrievedChunk]] = []
         for document_id, chunk_list in self.chunks.items():
             record = self.documents.get(document_id)
-            if record is None:
+            if record is None or record.status != "ACTIVE":
                 continue
-            scope = self._scope_by_document.get(document_id)
-            in_scope = record.tenant == tenant or (
-                scope == shared_scope and record.tenant != tenant
-            )
-            if not in_scope:
+            if not self._in_scope(document_id, record, tenant, shared_scope):
                 continue
-            parents_by_hash = {
-                chunk.chunk_hash: chunk
-                for chunk, _scope, _owner in chunk_list
-                if chunk.chunk_kind == PARENT_KIND
-            }
-            for chunk, _scope, _owner in chunk_list:
-                if not chunk.embedding:
-                    continue
-                score = _cosine(query_embedding, chunk.embedding)
-                if chunk.chunk_kind == CHILD_KIND:
-                    parent = parents_by_hash.get(chunk.parent_hash or "")
-                    if parent is None:
-                        continue
-                    key = (document_id, parent.chunk_hash)
-                    current = hits.get(key)
-                    if current is None or score > current[0]:
-                        hits[key] = (
-                            score,
-                            RetrievedChunk(
-                                document=record.filename,
-                                page_number=parent.page_number,
-                                section_title=parent.section_title,
-                                chunk_text=parent.chunk_text,
-                                score=round(score, 4),
-                            ),
-                        )
-                elif chunk.chunk_kind is None:
-                    legacy.append(
-                        (
-                            score,
-                            RetrievedChunk(
-                                document=record.filename,
-                                page_number=chunk.page_number,
-                                section_title=chunk.section_title,
-                                chunk_text=chunk.chunk_text,
-                                score=round(score, 4),
-                            ),
-                        )
-                    )
+            self._rank_document(document_id, record, chunk_list, query_embedding, hits, legacy)
         merged = list(chain(hits.values(), legacy))
         merged.sort(key=lambda pair: pair[0], reverse=True)
         return [chunk for _score, chunk in merged[:top_k]]
+
+    def _in_scope(
+        self, document_id: str, record: DocumentRecord, tenant: str, shared_scope: str
+    ) -> bool:
+        scope = self._scope_by_document.get(document_id)
+        return record.tenant == tenant or (scope == shared_scope and record.tenant != tenant)
+
+    def _rank_document(
+        self,
+        document_id: str,
+        record: DocumentRecord,
+        chunk_list: list[tuple[ChunkInsert, str | None, str]],
+        query_embedding: list[float],
+        hits: dict[tuple[str, str], tuple[float, RetrievedChunk]],
+        legacy: list[tuple[float, RetrievedChunk]],
+    ) -> None:
+        parents_by_hash = {
+            chunk.chunk_hash: chunk
+            for chunk, _scope, _owner in chunk_list
+            if chunk.chunk_kind == PARENT_KIND
+        }
+        for chunk, _scope, _owner in chunk_list:
+            if not chunk.embedding:
+                continue
+            score = _cosine(query_embedding, chunk.embedding)
+            if chunk.chunk_kind == CHILD_KIND:
+                parent = parents_by_hash.get(chunk.parent_hash or "")
+                if parent is None:
+                    continue
+                key = (document_id, parent.chunk_hash)
+                current = hits.get(key)
+                if current is None or score > current[0]:
+                    hits[key] = (
+                        score,
+                        RetrievedChunk(
+                            document=record.filename,
+                            page_number=parent.page_number,
+                            section_title=parent.section_title,
+                            chunk_text=parent.chunk_text,
+                            score=round(score, 4),
+                        ),
+                    )
+            elif chunk.chunk_kind is None:
+                legacy.append(
+                    (
+                        score,
+                        RetrievedChunk(
+                            document=record.filename,
+                            page_number=chunk.page_number,
+                            section_title=chunk.section_title,
+                            chunk_text=chunk.chunk_text,
+                            score=round(score, 4),
+                        ),
+                    )
+                )

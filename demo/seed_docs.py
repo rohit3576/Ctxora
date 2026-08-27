@@ -6,6 +6,7 @@ Usage:
 """
 
 import argparse
+import re
 from pathlib import Path
 
 from config.settings import RagConfig, Settings, get_settings, load_app_config
@@ -19,8 +20,8 @@ from rag.ingest import ingest
 from rag.store import PGRagStore
 
 DOCS_DIR = Path(__file__).parent / "docs"
-# Families grouped oldest-first: R4e will supersede same-family older versions
-# on upload, so seeding order fixes which revision ends ACTIVE.
+# Families grouped oldest-first: the R4e lifecycle supersedes same-family
+# older versions on upload, so seeding order fixes which revision ends ACTIVE.
 DOC_FILES = (
     "door-sensor-ds200-manual-v1.md",
     "door-sensor-ds200-manual-v2.md",
@@ -31,12 +32,21 @@ DOC_FILES = (
 )
 HASH_EMBEDDING_MODEL = "hash-embed-1536"
 
+_FAMILY_PATTERN: re.Pattern[str] = re.compile(r"^(?P<family>.+-manual)-v(?P<version>[0-9.]+)$")
+
+
+def _family_version(filename: str) -> tuple[str, str] | None:
+    """door-sensor-ds200-manual-v2.md -> ("door-sensor-ds200-manual", "2")."""
+    match = _FAMILY_PATTERN.match(filename.rsplit(".", 1)[0])
+    return (match.group("family"), match.group("version")) if match else None
+
 
 def seed_documents(
     store: RagStore, llm: LLMClient, config: RagConfig, tenant: str, embedding_model: str
 ) -> None:
     """Ingest every demo document (idempotent via content-hash dedupe)."""
     for name in DOC_FILES:
+        meta = _family_version(name)
         record = ingest(
             store,
             llm,
@@ -45,10 +55,12 @@ def seed_documents(
             name,
             (DOCS_DIR / name).read_bytes(),
             embedding_model=embedding_model,
+            doc_family=meta[0] if meta else None,
+            doc_version=meta[1] if meta else None,
         )
         print(
             f"{name}: {record.chunk_count} chunks / {record.total_pages} pages"
-            f" (document {record.id})"
+            f" (document {record.id}, status {record.status})"
         )
 
 

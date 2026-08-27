@@ -39,6 +39,9 @@ class DocumentRecord:
     total_pages: int
     chunk_count: int
     created_at: datetime.datetime | None = None
+    doc_family: str | None = None
+    doc_version: str | None = None
+    status: str = "ACTIVE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,8 +68,17 @@ class RagStore(Protocol):
         total_pages: int,
         embedding_model: str,
         scope: str | None = None,
+        doc_family: str | None = None,
+        doc_version: str | None = None,
+        supersede_ids: tuple[str, ...] = (),
+        status: str = "ACTIVE",
     ) -> DocumentRecord | None:
-        """Persist document + chunks; None when the hash already exists."""
+        """Persist document + chunks; None when the hash already exists.
+
+        supersede_ids flip to SUPERSEDED in the same transaction as the
+        document insert; status lets an already-obsolete upload be born
+        SUPERSEDED.
+        """
         ...
 
     def find_by_hash(self, tenant: str, file_hash: str) -> DocumentRecord | None:

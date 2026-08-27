@@ -10,10 +10,13 @@
 #   window: key and answer sit >120 words apart across a chunk boundary, so
 #   no current chunk holds both. They are expected to fail until chunker v2
 #   (R4d) returns whole-section parents — that drop is the 4b baseline point.
-# - version cases pin the newest revision of a family. Today both revisions
-#   stay ACTIVE and near-tie, so hits land at rank ~2 (MRR pain, R@5 may
-#   hold). Post-R4e (ACTIVE-only search) they must hit at rank 1 — regress
-#   to 0 if the lifecycle breaks.
+# - version cases pin the newest revision of a family. Post-R4e only the
+#   newest ACTIVE revision is searchable (older ones flip SUPERSEDED), so
+#   these must hit at rank 1; regress to 0 if the lifecycle breaks.
+#   err-e303-battery, battery-replace-part, and charge-1-8kg were originally
+#   pinned to superseded revisions; R4e re-pins them to the newest revision
+#   with contains canaries — if an obsolete doc ever leaks back into search,
+#   its old answer text fails the contains check.
 
 - id: err-e302
   tenant: demo
@@ -74,13 +77,19 @@
 - id: charge-1-8kg
   tenant: demo
   question: Does the RU-500 take a 1.8 kg refrigerant charge?
-  expect: { document: refrigeration-ru500-manual-v2.0.md, section: Refrigerant Specifications }
+  expect:
+    document: refrigeration-ru500-manual-v2.3.md
+    section: Refrigerant Specifications
+    contains: [1.6 kg]
   tags: [identifier]
 
 - id: err-e303-battery
   tenant: demo
-  question: What does error E-303 battery low indicate?
-  expect: { document: door-sensor-ds200-manual-v1.md, section: Error Codes }
+  question: What does the DS-200 error code E-303 mean?
+  expect:
+    document: door-sensor-ds200-manual-v2.md
+    section: Error Codes
+    contains: [E-303, reed-switch drift]
   tags: [identifier]
 
 - id: lube-interval
@@ -280,7 +289,10 @@
 - id: battery-replace-part
   tenant: demo
   question: Does the battery-low error mean I replace sensor part TS-001?
-  expect: { document: door-sensor-ds200-manual-v1.md, section: Error Codes }
+  expect:
+    document: door-sensor-ds200-manual-v2.md
+    section: Error Codes
+    contains: [E-303]
   tags: [multi-hop]
 
 - id: pulldown-pressure
