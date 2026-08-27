@@ -405,7 +405,8 @@ class TestDeltaMiningNonBlocking:
     def test_sabotaged_diff_path_never_breaks_mining(self, monkeypatch: pytest.MonkeyPatch) -> None:
 
         def _boom(previous: str, corrected: str) -> dict[str, list[str]]:
-            raise RuntimeError("diff exploded")
+            msg = "diff exploded"
+            raise RuntimeError(msg)
 
         import feedback.hooks as feedback_hooks
 

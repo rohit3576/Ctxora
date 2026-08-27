@@ -165,22 +165,25 @@ def correction_delta(previous_sql: str, corrected_sql: str) -> dict[str, list[st
     before_filters, before_windows = _filters(before)
     after_filters, after_windows = _filters(after)
     delta: dict[str, list[str]] = {}
-    if added := sorted(set(after_filters) - set(before_filters)):
-        delta["added_filters"] = added
-    if removed := sorted(set(before_filters) - set(after_filters)):
-        delta["removed_filters"] = removed
+    set_diffs: tuple[tuple[str, list[str], list[str]], ...] = (
+        ("added_filters", after_filters, before_filters),
+        ("removed_filters", before_filters, after_filters),
+        ("added_time_windows", after_windows, before_windows),
+        ("removed_time_windows", before_windows, after_windows),
+        ("added_tables", _tables(after), _tables(before)),
+        ("removed_tables", _tables(before), _tables(after)),
+    )
+    for key, mine, theirs in set_diffs:
+        if gained := sorted(set(mine) - set(theirs)):
+            delta[key] = gained
+    before_columns, after_columns = _output_columns(before), _output_columns(after)
+    set_diffs = (
+        ("added_columns", after_columns, before_columns),
+        ("removed_columns", before_columns, after_columns),
+    )
+    for key, mine, theirs in set_diffs:
+        if gained := sorted(set(mine) - set(theirs)):
+            delta[key] = gained
     if agg_changes := _pair_changes(_aggregations(before), _aggregations(after)):
         delta["aggregation_changes"] = agg_changes
-    if columns_added := sorted(set(_output_columns(after)) - set(_output_columns(before))):
-        delta["added_columns"] = columns_added
-    if columns_removed := sorted(set(_output_columns(before)) - set(_output_columns(after))):
-        delta["removed_columns"] = columns_removed
-    if windows_added := sorted(set(after_windows) - set(before_windows)):
-        delta["added_time_windows"] = windows_added
-    if windows_removed := sorted(set(before_windows) - set(after_windows)):
-        delta["removed_time_windows"] = windows_removed
-    if tables_added := sorted(set(_tables(after)) - set(_tables(before))):
-        delta["added_tables"] = tables_added
-    if tables_removed := sorted(set(_tables(before)) - set(_tables(after))):
-        delta["removed_tables"] = tables_removed
     return delta

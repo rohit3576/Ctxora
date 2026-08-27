@@ -183,11 +183,13 @@ class TestPipelineTranspilePath:
         monkeypatch.setattr(pipeline_module, "transpile_to", _broken)
         llm = ScriptedLLM([CANONICAL_SQL, NATIVE_CH_SQL])
         store = RecordingStore()
-        with _client(tmp_path, llm, store) as client:
-            with caplog.at_level(logging.WARNING, logger="ctxora.pipeline"):
-                response = client.post(
-                    "/v1/query/sql", json={"tenant": "demo", "query": "average rpm?"}
-                )
+        with (
+            _client(tmp_path, llm, store) as client,
+            caplog.at_level(logging.WARNING, logger="ctxora.pipeline"),
+        ):
+            response = client.post(
+                "/v1/query/sql", json={"tenant": "demo", "query": "average rpm?"}
+            )
 
         assert response.status_code == 200
         question_prompts = [p for p in llm.generation_prompts if "SCHEMA" in p and "ROWS:" not in p]

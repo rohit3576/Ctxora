@@ -53,9 +53,15 @@ def _row_of(row: tuple[object, ...]) -> FeedbackRow:
         corrected_sql=_text(row[9]) or None,
         reviewed_by=_text(row[10]) or None,
         created_at=row[11] if isinstance(row[11], datetime.datetime) else None,
-        correction_delta=_delta_of(row[12]) if len(row) > 12 else None,
+        correction_delta=(
+            _delta_of(row[_CORRECTION_DELTA_COLUMN])
+            if len(row) > _CORRECTION_DELTA_COLUMN
+            else None
+        ),
     )
 
+
+_CORRECTION_DELTA_COLUMN: int = 12
 
 _SELECT_COLUMNS = (
     "id, tenant, nl_query, generated_sql, feedback_type, status, "

@@ -1,0 +1,37 @@
+name: sqlglot-probe
+
+# S5 governance: drift early-warning for the sqlglot AST surface. Installs
+# the LATEST version inside the pinned range (over the lock) and runs the
+# semantics pins only. A red probe = the next in-range upgrade will move a
+# pinned behavior — triage via docs/internal/SQLGLOT_UPGRADE_RUNBOOK.md
+# before anyone bumps the lock. Non-blocking: not a required check.
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sync locked dependencies
+        run: uv sync --frozen
+
+      - name: Upgrade sqlglot to latest in-range
+        run: uv pip install --upgrade 'sqlglot>=26,<28'
+
+      - name: Report probed version
+        # --no-sync is load-bearing: a plain `uv run` would re-sync back to
+        # the locked version and the probe could never observe drift.
+        run: uv run --no-sync python -c "import sqlglot; print('probing sqlglot', sqlglot.__version__)"
+
+      - name: Semantics pins (red = drift)
+        run: uv run --no-sync pytest tests/test_sqlglot_semantics.py -q
