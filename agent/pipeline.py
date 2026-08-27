@@ -14,15 +14,17 @@ from agent.assume_first import Assumptions, assume_first
 from agent.conversation import ConversationContext
 from agent.correction import Clarify, Correction, CorrectionDetector, NotCorrection
 from agent.followup import resolve_followup
-from agent.generator import SQLGenerator
+from agent.generator import GenerationOutcome, SQLGenerator
 from agent.greeting import REPLY as GREETING_REPLY
 from agent.greeting import is_greeting
 from agent.key_resolver import KeyResolver, ResolvedKeys
 from agent.prompt_builder import PromptBuilder
 from agent.summarizer import Summarizer
-from agent.validator import SQLValidator
+from agent.transpile import transpile_to
+from agent.validator import SQLValidator, ValidationResult
 from config.settings import AppConfig
-from database.contracts import JsonScalar, TelemetryStore
+from database.contracts import Dialect, JsonScalar, TelemetryStore
+from database.dialects.postgres import PostgresDialect
 from knowledge.contracts import SQLExample, TenantKnowledge
 from knowledge.store import KnowledgeStore
 from llm.client import LLMClient
@@ -219,7 +221,10 @@ def _run_sql_flow(
 
     digest_text = _digest_text(conversation, digest_cache, deps)
     examples_override = _semantic_examples(question, tenant, deps, knowledge)
-    builder = PromptBuilder(dialect=deps.store.dialect, mapping=mapping)
+    transpile_parity = deps.config.flags.transpile_parity
+    canonical_path = transpile_parity and deps.store.dialect.sqlglot_name != "postgres"
+    prompt_dialect: Dialect = PostgresDialect() if transpile_parity else deps.store.dialect
+    builder = PromptBuilder(dialect=prompt_dialect, mapping=mapping)
     system, user = builder.build(
         knowledge,
         resolved.keys,
@@ -229,7 +234,8 @@ def _run_sql_flow(
     )
 
     observe(STAGE_GENERATING)
-    generated = SQLGenerator(llm=deps.llm).generate(system, user, temperature=temperature)
+    generator = SQLGenerator(llm=deps.llm)
+    generated = generator.generate(system, user, temperature=temperature)
 
     observe(STAGE_VALIDATING)
     validator = SQLValidator(
@@ -242,7 +248,20 @@ def _run_sql_flow(
         deny_star_selects=deps.config.agent.deny_star_selects,
         extra_schemas=extra_schemas,
     )
-    validation = validator.validate(generated.sql)
+
+    def regenerate_native() -> GenerationOutcome:
+        native_system, native_user = PromptBuilder(
+            dialect=deps.store.dialect, mapping=mapping
+        ).build(
+            knowledge,
+            resolved.keys,
+            question_final,
+            session_context=digest_text,
+            examples_override=examples_override,
+        )
+        return generator.generate(native_system, native_user, temperature=temperature)
+
+    validation = _validated_for_store(deps, validator, generated, canonical_path, regenerate_native)
     if not validation.valid:
         return QueryRejected(errors=validation.errors)
 
@@ -273,6 +292,65 @@ def _run_sql_flow(
         completion_tokens=generated.completion_tokens,
         assumption_note=assumption_note,
     )
+
+
+def _validated_for_store(
+    deps: AgentDeps,
+    validator: SQLValidator,
+    generated: GenerationOutcome,
+    canonical_path: bool,
+    regenerate_native: Callable[[], GenerationOutcome],
+) -> ValidationResult:
+    """Validate the generation for the store's dialect (S4 transpile path).
+
+    canonical_path: the store is not the canonical dialect and the
+    transpile_parity flag is on — validate canonically, post-fix engine
+    idioms, transpile, then validate the transpiled SQL through the same
+    target-dialect gauntlet (transpilation is a transformation, not a
+    trust boundary). Any failure along that chain logs the divergence and
+    falls back to native-dialect regeneration (the v1 path).
+    """
+    if not canonical_path:
+        return validator.validate(generated.sql)
+
+    canonical_validator = SQLValidator(
+        dialect=PostgresDialect(),
+        mapping=validator.mapping,
+        allowed_tables=validator.allowed_tables,
+        repair_v2=validator.repair_v2,
+        repair_passes=validator.repair_passes,
+        qualify=validator.qualify,
+        deny_star_selects=validator.deny_star_selects,
+        extra_schemas=validator.extra_schemas,
+    )
+    canonical = canonical_validator.validate(generated.sql)
+    if canonical.valid:
+        postfixed = deps.store.dialect.postfix_canonical(canonical.normalized_sql)
+        transpiled = transpile_to(postfixed, deps.store.dialect.sqlglot_name)
+        if transpiled is not None:
+            target = validator.validate(transpiled)
+            if target.valid:
+                return target
+            _logger.warning(
+                "transpile divergence: target validation failed (canonical=%r, "
+                "transpiled=%r, errors=%s)",
+                canonical.normalized_sql,
+                transpiled,
+                target.errors,
+            )
+        else:
+            _logger.warning(
+                "transpile divergence: transpile failed (canonical=%r)",
+                canonical.normalized_sql,
+            )
+    else:
+        _logger.warning(
+            "transpile divergence: canonical validation failed (%s) for %r",
+            canonical.errors,
+            generated.sql,
+        )
+    native = regenerate_native()
+    return validator.validate(native.sql)
 
 
 def _semantic_examples(

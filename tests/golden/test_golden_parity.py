@@ -7,6 +7,7 @@ must not break parity testing.
 """
 
 from collections.abc import Iterator, Sequence
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -198,3 +199,92 @@ def test_dialect_snapshots_differ_between_adapters(tmp_path: object) -> None:
 
     assert "toFloat64OrNull" in ch[0]
     assert "NULLIF" in pg[0]
+
+
+CANONICAL_SQL = (
+    "SELECT avg(NULLIF(value, '')::double precision) FROM demo_telemetry WHERE key = 'engine.rpm'"
+)
+
+
+class TranspileGoldenLLM:
+    """Answers every question with the CANONICAL (postgres-grammar) SQL.
+
+    S4's mechanical parity leg: one engine-neutral generation, transpiled
+    and post-fixed per store — no hand-scripted per-dialect SQL anywhere.
+    """
+
+    def __init__(self) -> None:
+        self.generation_prompts: list[str] = []
+
+    def generate(self, system: str, user: str, *, temperature: float) -> GenResult:
+        self.generation_prompts.append(user)
+        if "QUESTION:" in user and "ROWS:" not in user:
+            return GenResult(
+                sql=CANONICAL_SQL,
+                raw=f"```sql\n{CANONICAL_SQL}\n```",
+                prompt_tokens=10,
+                completion_tokens=10,
+            )
+        return GenResult(
+            sql="",
+            raw="Truck-102 averaged 1487.5 rpm yesterday.",
+            prompt_tokens=5,
+            completion_tokens=5,
+        )
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        return [[0.1] for _ in texts]
+
+
+@pytest.fixture(params=["clickhouse", "postgres"], ids=["ch-t", "pg-t"])
+def transpile_client(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> Iterator[tuple[TestClient, GoldenStore, TranspileGoldenLLM]]:
+    dialect = (
+        ClickHouseDialect()
+        if request.param == "clickhouse"
+        else PostgresDialect(use_timescale=True)
+    )
+    store = GoldenStore(dialect)
+    llm = TranspileGoldenLLM()
+    tuned = (
+        Path(DEFAULT_CONFIG_PATH)
+        .read_text()
+        .replace("transpile_parity: false", "transpile_parity: true")
+    )
+    config_path = tmp_path / "defaults-transpile.yaml"
+    config_path.write_text(tuned)
+    app = create_app(
+        settings=Settings(),
+        config_path=config_path,
+        store=store,
+        knowledge_query=golden_query,
+        llm=llm,
+        memory=InMemoryMemoryStore(),
+    )
+    with TestClient(app) as client:
+        yield client, store, llm
+
+
+@pytest.mark.parametrize("question", QUESTIONS, ids=lambda q: q[:38])
+def test_golden_question_through_transpile_path(
+    transpile_client: tuple[TestClient, GoldenStore, TranspileGoldenLLM], question: str
+) -> None:
+    """S4 acceptance: one canonical generation, both engines, strict rows."""
+    client, store, llm = transpile_client
+
+    status, data = answer_for(client, question)
+
+    assert status == 200, f"golden question failed through transpile path: {question}"
+    envelope_data = TypeAdapter(dict[str, object]).validate_python(data)
+    assert envelope_data["rows"] == DEMO_ROW
+    assert envelope_data["sql"]
+    question_prompts = [p for p in llm.generation_prompts if "SCHEMA" in p and "ROWS:" not in p]
+    assert len(question_prompts) == 1, "exactly one generation call per question"
+    executed = store.executed[-1]
+    assert executed.lstrip().upper().startswith("SELECT")
+    if isinstance(store.dialect, ClickHouseDialect):
+        assert "toFloat64OrNull" in executed, "post-fixed engine idiom on ClickHouse"
+        assert "NULLIF" not in executed
+    else:
+        assert "NULLIF" in executed, "canonical idiom runs natively on Postgres"

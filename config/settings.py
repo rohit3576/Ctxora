@@ -234,6 +234,7 @@ class Flags(BaseModel):
     repair_v2: bool = False
     qualify: bool = False
     structural_similarity: bool = False
+    transpile_parity: bool = False
 
 
 class RoutingConfig(BaseModel):

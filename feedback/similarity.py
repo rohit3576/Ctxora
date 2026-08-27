@@ -150,7 +150,7 @@ def _tables(ast: exp.Expression) -> list[str]:
 def _pair_changes(before: Counter[str], after: Counter[str]) -> list[str]:
     removed = sorted((before - after).elements())
     added = sorted((after - before).elements())
-    changes = [f"{old} -> {new}" for old, new in zip(removed, added)]
+    changes = [f"{old} -> {new}" for old, new in zip(removed, added, strict=False)]
     changes.extend(f"+ {name}" for name in added[len(removed) :])
     changes.extend(f"- {name}" for name in removed[len(added) :])
     return changes

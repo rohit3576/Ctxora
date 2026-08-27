@@ -41,6 +41,10 @@ class PostgresDialect:
         """JSON payload field as float: (col::jsonb ->> 'field')::double precision."""
         return f"({json_col}::jsonb ->> '{field}')::double precision"
 
+    def postfix_canonical(self, sql: str) -> str:
+        """Canonical dialect: its own grammar needs no rewriting."""
+        return sql
+
     def time_bucket(self, ts_col: str, interval: str) -> str:
         """Single-unit buckets via date_trunc; multi-unit via Timescale when available."""
         n, unit = _parse_interval(interval)

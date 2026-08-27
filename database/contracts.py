@@ -79,6 +79,16 @@ class Dialect(Protocol):
         """Bucket expression for an interval like '1 HOUR' or '30 MINUTE'."""
         ...
 
+    def postfix_canonical(self, sql: str) -> str:
+        """Rewrite canonical (postgres-grammar) SQL before transpiling (S4).
+
+        Identity by default: dialects whose idioms transpile cleanly need
+        no post-fixing. Rewrites run on the canonical tree, where details
+        the target dialect's parser would drop (e.g. array_agg ORDER BY)
+        are still intact.
+        """
+        ...
+
     def now_minus(self, unit: str, n: int) -> str:
         """Expression for now minus n units (unit like 'DAY', 'HOUR')."""
         ...
