@@ -13,6 +13,8 @@ types (TokenError at tokenize, ParseError at parse) and TokenError is NOT
 a ParseError subclass — the validator's parse gate must catch both.
 """
 
+from typing import ClassVar
+
 import pytest
 import sqlglot
 from sqlglot import errors as sqerr
@@ -338,3 +340,112 @@ class TestRepairTransformBehaviors:
         assert ast.sql(dialect="postgres") == (
             "WITH a AS (SELECT 1 AS x) SELECT * FROM (SELECT x FROM a)"
         )
+
+
+# --- (n) S2 qualify behaviors ---
+
+
+class TestQualifyBehaviors:
+    SCHEMA: ClassVar[dict[str, dict[str, str]]] = {
+        "demo_telemetry": {
+            "timestamp": "datetime",
+            "device_id": "string",
+            "key": "string",
+            "value": "string",
+        }
+    }
+
+    def test_qualify_resolves_cte_shadow_to_the_cte(self) -> None:
+        """Observed: a CTE named like a real table makes the referencing
+        scope's source a Scope (CTE), while base tables stay direct
+        exp.Table sources — REQUIRED: this distinction is what makes the
+        scope-walk allowlist exact where the name-set heuristic guessed."""
+        from sqlglot.optimizer.scope import Scope, build_scope
+
+        ast = sqlglot.parse_one(
+            "WITH demo_telemetry AS (SELECT 1 AS key) SELECT key FROM demo_telemetry",
+            read="postgres",
+        )
+        scope = build_scope(ast)
+        assert scope is not None
+        sources = scope.sources
+
+        assert isinstance(sources["demo_telemetry"], Scope)
+        assert not isinstance(sources["demo_telemetry"], exp.Table)
+
+    def test_base_table_sources_are_direct_table_nodes(self) -> None:
+        """Observed: a real (non-CTE) table source is the exp.Table itself,
+        aliased or not, and Table.name is the table name, not the alias."""
+        from sqlglot.optimizer.scope import build_scope
+
+        ast = sqlglot.parse_one("SELECT t.key FROM demo_telemetry t", read="postgres")
+        scope = build_scope(ast)
+        assert scope is not None
+        sources = scope.sources
+
+        source = sources["t"]
+        assert isinstance(source, exp.Table)
+        assert source.name == "demo_telemetry"
+
+    def test_unknown_table_column_raises_optimize_error(self) -> None:
+        """Observed: a column read from a schema-unknown table fails qualify
+        with OptimizeError 'could not be resolved' — the typed reject class
+        for schema-unknown-table (indirect: via the column, not the table)."""
+        from sqlglot.optimizer.qualify import qualify
+
+        ast = sqlglot.parse_one("SELECT key FROM sql_agent_tenants", read="postgres")
+        with pytest.raises(sqerr.OptimizeError, match="could not be resolved"):
+            qualify(ast, dialect="postgres", schema=self.SCHEMA)
+
+    def test_unknown_column_on_schema_table_raises_optimize_error(self) -> None:
+        """Observed: a column absent from the schema'd table raises the same
+        OptimizeError — unknown and ambiguous columns share one failure
+        surface ('could not be resolved')."""
+        from sqlglot.optimizer.qualify import qualify
+
+        ast = sqlglot.parse_one("SELECT nonexistent FROM demo_telemetry", read="postgres")
+        with pytest.raises(sqerr.OptimizeError, match="could not be resolved"):
+            qualify(ast, dialect="postgres", schema=self.SCHEMA)
+
+    def test_star_expands_against_schema_but_not_unknown_tables(self) -> None:
+        """Observed: SELECT * on a schema'd table expands to its columns;
+        on an unknown table qualify returns SILENTLY without expansion —
+        REQUIRED pin: qualify alone is NOT a table gate; the scope-walk
+        allowlist must stay the authority."""
+        from sqlglot.optimizer.qualify import qualify
+
+        expanded = qualify(
+            sqlglot.parse_one("SELECT * FROM demo_telemetry", read="postgres"),
+            dialect="postgres",
+            schema=self.SCHEMA,
+        )
+        assert [col.name for col in expanded.find_all(exp.Column)] == [
+            "timestamp",
+            "device_id",
+            "key",
+            "value",
+        ]
+
+        unexpanded = qualify(
+            sqlglot.parse_one("SELECT * FROM sql_agent_tenants", read="postgres"),
+            dialect="postgres",
+            schema=self.SCHEMA,
+        )
+        assert any(isinstance(node, exp.Star) for node in unexpanded.walk())
+
+    def test_qualified_refs_to_unschema_table_pass(self) -> None:
+        """Observed: a second (events-shaped) table absent from the schema
+        passes qualify when its columns are explicitly qualified — REQUIRED:
+        events tables must be schema'd too, or bare event columns over-block."""
+        from sqlglot.optimizer.qualify import qualify
+
+        ast = sqlglot.parse_one(
+            "SELECT b.event_type FROM demo_telemetry a JOIN demo_events b"
+            " ON a.device_id = b.device_id",
+            read="postgres",
+        )
+        qualify(ast, dialect="postgres", schema=self.SCHEMA)
+
+        bare = sqlglot.parse_one("SELECT event_type FROM demo_events", read="postgres")
+        with pytest.raises(sqerr.OptimizeError):
+            qualify(bare, dialect="postgres", schema=self.SCHEMA)

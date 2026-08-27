@@ -204,8 +204,18 @@ def _run_sql_flow(
     mapping = deps.config.stores.telemetry.mapping
     allowed_tables = [mapping.table.format(tenant=tenant)]
     events = deps.config.stores.events
+    extra_schemas: dict[str, dict[str, str]] = {}
     if events.enabled and events.mapping is not None:
-        allowed_tables.append(events.mapping.table.format(tenant=tenant))
+        em = events.mapping
+        events_table = em.table.format(tenant=tenant)
+        allowed_tables.append(events_table)
+        extra_schemas[events_table] = {
+            em.timestamp: "datetime",
+            em.entity_id: "text",
+            em.event_type: "text",
+            em.payload: "text",
+        }
+    resolved_mapping = mapping.model_copy(update={"table": allowed_tables[0]})
 
     digest_text = _digest_text(conversation, digest_cache, deps)
     examples_override = _semantic_examples(question, tenant, deps, knowledge)
@@ -224,10 +234,13 @@ def _run_sql_flow(
     observe(STAGE_VALIDATING)
     validator = SQLValidator(
         dialect=deps.store.dialect,
-        mapping=mapping,
+        mapping=resolved_mapping,
         allowed_tables=tuple(allowed_tables),
         repair_v2=deps.config.flags.repair_v2,
         repair_passes=deps.config.agent.repair_passes,
+        qualify=deps.config.flags.qualify,
+        deny_star_selects=deps.config.agent.deny_star_selects,
+        extra_schemas=extra_schemas,
     )
     validation = validator.validate(generated.sql)
     if not validation.valid:

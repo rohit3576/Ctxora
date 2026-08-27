@@ -58,6 +58,10 @@ reportUnusedParameter = "none"
 # types-PYYAML is untyped upstream: yaml.safe_load returns Any at one
 # documented boundary (config/settings.py). Kept as a visible warning there.
 reportAny = "warning"
+# sqlglot.optimizer (qualify + scope walk) ships without full stubs: those
+# boundaries are visible warnings, same treatment as YAML above.
+reportUnknownMemberType = "warning"
+reportUnknownVariableType = "warning"
 # Multiline SQL/prompt strings use implicit concatenation as house style
 # (ruff ISC001/ISC004 mirror this decision).
 reportImplicitStringConcatenation = "none"
@@ -210,6 +214,11 @@ fixable = ["ALL"]
 "rag/contracts.py" = [
     "PLR0913",  # save_document carries the full ingest tuple by interface contract
     "PLR0917",  # same
+]
+"agent/validator.py" = [
+    "PLR0913",  # validator carries the full gate configuration by interface contract
+    "PLR0917",  # same
+    "PLR0911",  # Layer-1 returns one typed error per fail-closed branch
 ]
 "rag/fake.py" = [
     "PLR0913",  # mirrors the protocol signature

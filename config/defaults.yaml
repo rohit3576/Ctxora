@@ -45,6 +45,7 @@ agent:
     - location
   digest_turn_threshold: 10
   repair_passes: 3                 # S1: AST repair loop bound (repair_v2)
+  deny_star_selects: false         # S2: reject SELECT * when qualify is on
 
 rag:
   chunk_size: 800
@@ -76,6 +77,7 @@ flags:
   followup: false
   greeting: false
   repair_v2: true                  # S1: AST repair taxonomy (false = single regex pass)
+  qualify: true                    # S2: qualified gauntlet — exact scope-walk table checks
 
 routing:
   sql_indicators:

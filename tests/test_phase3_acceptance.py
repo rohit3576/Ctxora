@@ -17,7 +17,11 @@ from memory.fake import InMemoryMemoryStore
 from tests.test_pipeline_e2e import DemoFakeLLM, DemoStore, demo_knowledge_query
 
 DEMO_SQL = "SELECT avg(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'engine.rpm'"
+# S1 add-limit bounds unbounded telemetry selects post-validation, so the
+# executed/returned form carries LIMIT 1000 while generators emit DEMO_SQL.
+EXPECTED_SQL = f"{DEMO_SQL} LIMIT 1000"
 MAX_SQL = "SELECT max(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'engine.rpm'"
+EXPECTED_MAX_SQL = f"{MAX_SQL} LIMIT 1000"
 
 FLAGS_ON: dict[str, bool] = {
     "correction_loop": True,
@@ -132,7 +136,7 @@ class TestCorrectionAcceptance:
             },
         ).json()["data"]
 
-        assert second["sql"] == MAX_SQL
+        assert second["sql"] == EXPECTED_MAX_SQL
         assert llm.generation_temperatures[-1] == pytest.approx(0.3)
 
         page = memory.list_history("demo")
@@ -181,7 +185,7 @@ class TestCorrectionAcceptance:
 
         data = response.json()["data"]
         assert data is not None
-        assert data["sql"] == DEMO_SQL
+        assert data["sql"] == EXPECTED_SQL
         assert llm.generation_temperatures[-1] == pytest.approx(0.0)
 
 
@@ -255,7 +259,7 @@ class TestFlagsOffParity:
                 "/v1/query/sql", json={"tenant": "demo", "query": "average rpm?"}
             ).json()["data"]
 
-        assert first["sql"] == DEMO_SQL
+        assert first["sql"] == EXPECTED_SQL
         assert first["assumptionNote"] is None
         assert first["followUpQuestions"] == []
 

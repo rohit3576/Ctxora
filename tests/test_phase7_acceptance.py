@@ -82,7 +82,9 @@ def ratelimit_on(tmp_path: Path) -> Path:
     """defaults.yaml with ratelimit flag on and a small limit."""
     tuned = Path(DEFAULT_CONFIG_PATH).read_text()
     tuned = tuned.replace("ratelimit: false", "ratelimit: true")
-    tuned = tuned.replace("requests_per_minute: 60", "requests_per_minute: 6000")
+    # The defaults' 60 rpm keeps refill (~1 token/s) negligible inside a
+    # fast test run; higher rates made the 429 dependent on sub-10ms
+    # request latency (qualify added ~ms per validation and flaked it).
     tuned = tuned.replace("burst: 10", "burst: 3")
     path = tmp_path / "rl.yaml"
     path.write_text(tuned)

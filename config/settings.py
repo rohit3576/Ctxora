@@ -177,6 +177,7 @@ class AgentConfig(BaseModel):
     aggregation_defaults: dict[str, str] = {"*": "average"}
     digest_turn_threshold: int = 10
     repair_passes: int = 1
+    deny_star_selects: bool = False
     title_keywords: tuple[str, ...] = (
         "speed",
         "rpm",
@@ -231,6 +232,7 @@ class Flags(BaseModel):
     greeting: bool = False
     ratelimit: bool = False
     repair_v2: bool = False
+    qualify: bool = False
 
 
 class RoutingConfig(BaseModel):

@@ -23,6 +23,9 @@ from memory.fake import InMemoryMemoryStore
 from tests.fakes import FakeLLM
 
 DEMO_SQL = "SELECT avg(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'engine.rpm'"
+# S1 add-limit bounds unbounded telemetry selects post-validation, so the
+# executed/returned form carries LIMIT 1000 while generators emit DEMO_SQL.
+EXPECTED_SQL = f"{DEMO_SQL} LIMIT 1000"
 
 
 class DemoStore:
@@ -172,11 +175,11 @@ class TestQuerySQLEndpoint:
         assert envelope.status == "Success"
         data = envelope.data
         assert data is not None
-        assert data.sql == DEMO_SQL
+        assert data.sql == EXPECTED_SQL
         assert data.rows == [{"device_id": "truck-102", "avg_rpm": 1487.5}]
         assert "1487.5" in data.summary
         assert data.resolvedKeys == ["engine.rpm"]
-        assert data.repairsApplied == []
+        assert data.repairsApplied == ["add-limit"]
 
     def test_delete_query_is_rejected_with_400(self, app_client: TestClient) -> None:
         response = app_client.post(
@@ -249,7 +252,7 @@ class TestStoreExecuted:
     ) -> None:
         app_client.post("/v1/query/sql", json={"tenant": "demo", "query": "average rpm?"})
 
-        assert demo_store.executed_sql == DEMO_SQL
+        assert demo_store.executed_sql == EXPECTED_SQL
 
 
 class TestProtocolConformance:

@@ -27,6 +27,9 @@ Battery voltage below 11.8 volts indicates a failing battery.
 """
 
 DEMO_SQL = "SELECT avg(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'engine.rpm'"
+# S1 add-limit bounds unbounded telemetry selects post-validation, so the
+# executed/returned form carries LIMIT 1000 while generators emit DEMO_SQL.
+EXPECTED_SQL = f"{DEMO_SQL} LIMIT 1000"
 
 
 class _DocView(BaseModel):
@@ -390,7 +393,7 @@ class TestUnifiedRouting:
         unified_data = unified.json()["data"]
         direct_data = direct.json()["data"]
         assert unified.json()["intent"] == "data"
-        assert unified_data["sql"] == direct_data["sql"] == DEMO_SQL
+        assert unified_data["sql"] == direct_data["sql"] == EXPECTED_SQL
         assert unified_data["summary"] == direct_data["summary"]
 
     def test_docs_question_routes_to_rag(
@@ -427,7 +430,7 @@ class TestUnifiedRouting:
         assert body["intent"] == "hybrid"
         data = body["data"]
         assert isinstance(data, dict)
-        assert data["sql"] == DEMO_SQL
+        assert data["sql"] == EXPECTED_SQL
         assert "docAnswer" in data
         assert "sources" in data
 
@@ -504,7 +507,7 @@ class TestOutageBoundaries:
         body: dict[str, object] = response.json()
         data = body["data"]
         assert isinstance(data, dict)
-        assert data["sql"] == DEMO_SQL
+        assert data["sql"] == EXPECTED_SQL
         assert "docAnswer" not in data
 
 

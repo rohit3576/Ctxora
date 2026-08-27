@@ -16,6 +16,9 @@ from tests.test_knowledge_store import canned_query
 from tests.test_pipeline_e2e import DemoStore
 
 DEMO_SQL = "SELECT avg(toFloat64OrNull(value)) FROM demo_telemetry WHERE key = 'engine.rpm'"
+# S1 add-limit bounds unbounded telemetry selects post-validation, so the
+# executed/returned form carries LIMIT 1000 while generators emit DEMO_SQL.
+EXPECTED_SQL = f"{DEMO_SQL} LIMIT 1000"
 
 
 def flags_on(tmp_path: Path, flag: str) -> Path:
@@ -85,7 +88,7 @@ class TestSemanticRetrieval:
 
         envelope = Envelope[QueryResponseData].model_validate_json(response.content)
         assert envelope.data is not None
-        assert envelope.data.sql == DEMO_SQL
+        assert envelope.data.sql == EXPECTED_SQL
         assert len(executor.semantic_selects) == 1
         assert len(executor.usage_updates) == 1
         assert llm.embed_calls == 1
@@ -134,7 +137,7 @@ class TestSemanticRetrieval:
 
         envelope = Envelope[QueryResponseData].model_validate_json(response.content)
         assert envelope.data is not None
-        assert envelope.data.sql == DEMO_SQL
+        assert envelope.data.sql == EXPECTED_SQL
 
     def test_flag_off_issues_zero_embed_calls(self) -> None:
         llm = VectorLLM()
