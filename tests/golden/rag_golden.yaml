@@ -2,6 +2,18 @@
 # tests/test_demo_docs.py locks the corpus facts these questions probe.
 # `context` is prior conversation for followup-tagged cases: the baseline
 # scores the bare question (the pain R2 fixes); post-R2 the rewrite uses it.
+#
+# R4a additions:
+# - `contains` expectations pin answer text; is_hit demands every string in
+#   the chunk body (case-insensitive).
+# - table/procedure split cases probe GT-800 sections that exceed the chunk
+#   window: key and answer sit >120 words apart across a chunk boundary, so
+#   no current chunk holds both. They are expected to fail until chunker v2
+#   (R4d) returns whole-section parents — that drop is the 4b baseline point.
+# - version cases pin the newest revision of a family. Today both revisions
+#   stay ACTIVE and near-tie, so hits land at rank ~2 (MRR pain, R@5 may
+#   hold). Post-R4e (ACTIVE-only search) they must hit at rank 1 — regress
+#   to 0 if the lifecycle breaks.
 
 - id: err-e302
   tenant: demo
@@ -278,3 +290,68 @@
     documents: [refrigeration-ru500-manual-v2.0.md, refrigeration-ru500-manual-v2.3.md]
     section: Pressure Settings
   tags: [multi-hop]
+
+- id: gt800-tank-note-interval
+  tenant: demo
+  question: What reporting interval does the GT-800 use for the auxiliary tank level channel CH-48?
+  expect:
+    documents:
+      [gps-tracker-gt800-manual-v1.0.md, gps-tracker-gt800-manual-v1.1.md]
+    section: Telemetry Channel Map
+    contains: [CH-48, 900 s]
+  tags: [table]
+
+- id: gt800-lvd-threshold
+  tenant: demo
+  question: What is the low-voltage disconnect threshold on channel CH-92 of the GT-800?
+  expect:
+    documents:
+      [gps-tracker-gt800-manual-v1.0.md, gps-tracker-gt800-manual-v1.1.md]
+    section: Telemetry Channel Map
+    contains: [CH-92, 11.8 V]
+  tags: [table]
+
+- id: gt800-gland-torque
+  tenant: demo
+  question: What torque applies to the GT-800 PG-9 cable gland collar?
+  expect:
+    documents:
+      [gps-tracker-gt800-manual-v1.0.md, gps-tracker-gt800-manual-v1.1.md]
+    section: Installation Procedure
+    contains: [PG-9, 2.5 Nm]
+  tags: [procedure]
+
+- id: gt800-v11-geofence
+  tenant: demo
+  question: How often does GT-800 firmware 1.1 report geofence breach events?
+  expect:
+    document: gps-tracker-gt800-manual-v1.1.md
+    section: Telemetry Channel Map
+    contains: [CH-09, 15 s]
+  tags: [version]
+
+- id: ru500-v23-charge
+  tenant: demo
+  question: Per controller software 2.3, what is the RU-500 refrigerant charge quantity?
+  expect:
+    document: refrigeration-ru500-manual-v2.3.md
+    section: Refrigerant Specifications
+    contains: [1.6 kg]
+  tags: [version]
+
+- id: ru500-v23-defrost-revision
+  tenant: demo
+  question: Which RU-500 manual revision covers the defrost procedure for controller software 2.3?
+  expect:
+    document: refrigeration-ru500-manual-v2.3.md
+    section: Defrost Procedure
+  tags: [version]
+
+- id: ds200-v2-torque
+  tenant: demo
+  question: What is the DS-200 mounting bolt torque on firmware 2.x units?
+  expect:
+    document: door-sensor-ds200-manual-v2.md
+    section: Maintenance Procedure
+    contains: [50 Nm]
+  tags: [version]

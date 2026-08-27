@@ -14,7 +14,15 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError,
 from rag.contracts import RetrievedChunk
 
 ALLOWED_TAGS: Final = frozenset(
-    ("identifier", "paraphrase", "table", "procedure", "followup", "multi-hop")
+    (
+        "identifier",
+        "paraphrase",
+        "table",
+        "procedure",
+        "followup",
+        "multi-hop",
+        "version",
+    )
 )
 
 
@@ -28,7 +36,12 @@ class GoldenSetError(Exception):
 
 
 class GoldenExpectation(BaseModel):
-    """Where the right answer lives: one document (or any of a list) + locator."""
+    """Where the right answer lives: one document (or any of a list) + locator.
+
+    `contains` pins the answer text itself: every string must appear in the
+    chunk body (case-insensitive). Split-table and version-pinned cases use it
+    so a hit requires the answer, not just the right section heading.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
@@ -36,6 +49,7 @@ class GoldenExpectation(BaseModel):
     documents: list[str] = Field(default_factory=list)
     section: str | None = None
     page: int | None = None
+    contains: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _exactly_one_document_selector(self) -> "GoldenExpectation":
@@ -109,7 +123,10 @@ def is_hit(chunk: RetrievedChunk, expectation: GoldenExpectation) -> bool:
         and expectation.section.lower() not in chunk.section_title.lower()
     ):
         return False
-    return expectation.page is None or chunk.page_number == expectation.page
+    if expectation.page is not None and chunk.page_number != expectation.page:
+        return False
+    body = chunk.chunk_text.lower()
+    return all(needle.lower() in body for needle in expectation.contains)
 
 
 def first_hit_rank(chunks: list[RetrievedChunk], expectation: GoldenExpectation) -> int | None:

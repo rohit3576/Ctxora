@@ -21,9 +21,13 @@ from tools.rag_eval_core import (
 GOLDEN_PATH = Path(__file__).parent / "golden" / "rag_golden.yaml"
 
 
-def _chunk(document: str, section: str, page: int = 1) -> RetrievedChunk:
+def _chunk(document: str, section: str, page: int = 1, text: str = "") -> RetrievedChunk:
     return RetrievedChunk(
-        document=document, page_number=page, section_title=section, chunk_text="", score=0.5
+        document=document,
+        page_number=page,
+        section_title=section,
+        chunk_text=text,
+        score=0.5,
     )
 
 
@@ -31,17 +35,18 @@ class TestGoldenSetFile:
     def test_loads_with_expected_size_and_tags(self) -> None:
         cases = load_golden(GOLDEN_PATH)
 
-        assert len(cases) >= 30
+        assert len(cases) >= 40
         tag_counts: dict[str, int] = {}
         for case in cases:
             for tag in case.tags:
                 tag_counts[tag] = tag_counts.get(tag, 0) + 1
         assert tag_counts["identifier"] >= 8
         assert tag_counts["paraphrase"] >= 6
-        assert tag_counts["table"] >= 5
-        assert tag_counts["procedure"] >= 5
+        assert tag_counts["table"] >= 7
+        assert tag_counts["procedure"] >= 6
         assert tag_counts["followup"] >= 3
         assert tag_counts["multi-hop"] >= 3
+        assert tag_counts["version"] >= 4
 
     def test_rejects_duplicate_ids(self, tmp_path: Path) -> None:
         bad = tmp_path / "bad.yaml"
@@ -99,6 +104,38 @@ class TestHitScoring:
         chunks = [_chunk("x.md", "A"), _chunk("m.md", "Error Codes"), _chunk("m.md", "Other")]
         assert first_hit_rank(chunks, GoldenExpectation(document="m.md")) == 2
         assert first_hit_rank(chunks, GoldenExpectation(document="z.md")) is None
+
+    def test_contains_requires_every_string_case_insensitively(self) -> None:
+        from tools.rag_eval_core import GoldenExpectation
+
+        expectation = GoldenExpectation(document="m.md", contains=["CH-48", "900 s"])
+        hit = _chunk("m.md", "Telemetry Channel Map", text="| CH-48 | … every 900 s to conserve")
+        miss_key = _chunk("m.md", "Telemetry Channel Map", text="| CH-47 | … every 900 s")
+        miss_answer = _chunk("m.md", "Telemetry Channel Map", text="| CH-48 | … every 30 s")
+
+        assert is_hit(hit, expectation)
+        assert not is_hit(miss_key, expectation)
+        assert not is_hit(miss_answer, expectation)
+
+    def test_contains_combines_with_section_locator(self) -> None:
+        from tools.rag_eval_core import GoldenExpectation
+
+        expectation = GoldenExpectation(
+            documents=["a.md", "b.md"], section="installation", contains=["2.5 nm"]
+        )
+        hit = _chunk("b.md", "Installation Procedure", text="torque the collar to 2.5 Nm")
+        wrong_section = _chunk("b.md", "Maintenance", text="torque the collar to 2.5 Nm")
+        wrong_doc = _chunk("c.md", "Installation Procedure", text="torque to 2.5 Nm")
+
+        assert is_hit(hit, expectation)
+        assert not is_hit(wrong_section, expectation)
+        assert not is_hit(wrong_doc, expectation)
+
+    def test_contains_empty_list_is_always_satisfied(self) -> None:
+        from tools.rag_eval_core import GoldenExpectation
+
+        expectation = GoldenExpectation(document="m.md")
+        assert is_hit(_chunk("m.md", "Anything", text=""), expectation)
 
 
 class TestMetrics:

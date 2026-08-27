@@ -19,11 +19,15 @@ from rag.ingest import ingest
 from rag.store import PGRagStore
 
 DOCS_DIR = Path(__file__).parent / "docs"
+# Families grouped oldest-first: R4e will supersede same-family older versions
+# on upload, so seeding order fixes which revision ends ACTIVE.
 DOC_FILES = (
     "door-sensor-ds200-manual-v1.md",
     "door-sensor-ds200-manual-v2.md",
     "refrigeration-ru500-manual-v2.0.md",
     "refrigeration-ru500-manual-v2.3.md",
+    "gps-tracker-gt800-manual-v1.0.md",
+    "gps-tracker-gt800-manual-v1.1.md",
 )
 HASH_EMBEDDING_MODEL = "hash-embed-1536"
 
