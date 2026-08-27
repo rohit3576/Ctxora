@@ -5,8 +5,8 @@ import logging
 
 from config.settings import RagConfig
 from llm.client import LLMClient
-from rag.chunker import chunk_pages
-from rag.contracts import ChunkInsert, DocumentRecord, RagStore
+from rag.chunker import chunk_pages, chunk_pages_v2, parent_max_words
+from rag.contracts import PARENT_KIND, ChunkInsert, DocumentRecord, RagStore
 from rag.parsers import UnsupportedFormatError, parse, supported
 
 _logger = logging.getLogger("ctxora.ingest")
@@ -32,6 +32,9 @@ def ingest(
 ) -> DocumentRecord:
     """Ingest one uploaded document; re-upload of the same hash is a no-op.
 
+    Re-uploading with a different chunker version than the stored document
+    re-chunks it: the old document is deleted and ingested fresh.
+
     Raises:
         UnsupportedFormatError: filename suffix has no parser.
         IngestError: empty parse, oversized upload, or embedding failure.
@@ -45,21 +48,31 @@ def ingest(
     file_hash = hashlib.sha256(content).hexdigest()
     existing = store.find_by_hash(tenant, file_hash)
     if existing is not None:
-        _logger.info("document %s already ingested for %s (hash match)", filename, tenant)
-        return existing
+        if store.has_parented_chunks(existing.id) == config.chunking_v2:
+            _logger.info("document %s already ingested for %s (hash match)", filename, tenant)
+            return existing
+        _logger.info(
+            "document %s stored with a different chunker; re-chunking for %s", filename, tenant
+        )
+        store.delete_document(tenant, existing.id)
 
     pages = parse(filename, content)
-    chunks = chunk_pages(pages, config.chunk_size, config.chunk_overlap)
+    if config.chunking_v2:
+        chunks = chunk_pages_v2(pages, config.chunk_size, parent_max_words(config.chunk_size))
+    else:
+        chunks = chunk_pages(pages, config.chunk_size, config.chunk_overlap)
     if not chunks:
         msg = "document produced no extractable text"
         raise IngestError(msg)
 
+    embed_rows = [chunk for chunk in chunks if chunk.chunk_kind != PARENT_KIND]
     try:
-        embeddings = llm.embed([chunk.chunk_text for chunk in chunks])
+        embeddings = llm.embed([chunk.chunk_text for chunk in embed_rows])
     except Exception as exc:
         msg = f"embedding failed: {exc}"
         raise IngestError(msg) from exc
 
+    embedding_iter = iter(embeddings)
     embedded = tuple(
         ChunkInsert(
             page_number=chunk.page_number,
@@ -67,9 +80,11 @@ def ingest(
             section_title=chunk.section_title,
             chunk_text=chunk.chunk_text,
             chunk_hash=chunk.chunk_hash,
-            embedding=embedding,
+            embedding=[] if chunk.chunk_kind == PARENT_KIND else next(embedding_iter),
+            chunk_kind=chunk.chunk_kind,
+            parent_hash=chunk.parent_hash,
         )
-        for chunk, embedding in zip(chunks, embeddings, strict=True)
+        for chunk in chunks
     )
     record = store.save_document(
         tenant=tenant,

@@ -4,10 +4,19 @@ import datetime
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+PARENT_KIND = "PARENT"
+CHILD_KIND = "CHILD"
+
 
 @dataclass(frozen=True, slots=True)
 class ChunkInsert:
-    """One chunk about to be persisted."""
+    """One chunk about to be persisted.
+
+    v2 chunking emits parents (whole bounded sections, chunk_kind=PARENT,
+    never embedded) and children (structural units, chunk_kind=CHILD,
+    parent_hash links to the parent's chunk_hash). v1 chunks leave both
+    fields None.
+    """
 
     page_number: int
     chunk_index: int
@@ -15,6 +24,8 @@ class ChunkInsert:
     chunk_text: str
     chunk_hash: str
     embedding: list[float]
+    chunk_kind: str | None = None
+    parent_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +79,10 @@ class RagStore(Protocol):
 
     def delete_document(self, tenant: str, document_id: str) -> bool:
         """Remove one document and its chunks; False when unknown."""
+        ...
+
+    def has_parented_chunks(self, document_id: str) -> bool:
+        """Whether the document's chunks use the v2 parent/child shape."""
         ...
 
     def search(

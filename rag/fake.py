@@ -5,9 +5,10 @@ import hashlib
 import math
 import re
 from collections.abc import Sequence
+from itertools import chain
 
 from llm.client import GenResult
-from rag.contracts import ChunkInsert, DocumentRecord, RetrievedChunk
+from rag.contracts import CHILD_KIND, PARENT_KIND, ChunkInsert, DocumentRecord, RetrievedChunk
 
 _EMBED_DIM: int = 1536  # must match rag_chunks.embedding VECTOR(1536)
 _TOKEN: re.Pattern[str] = re.compile(r"[a-z0-9][a-z0-9.-]*")
@@ -136,6 +137,11 @@ class InMemoryRagStore:
         self._scope_by_document.pop(document_id, None)
         return True
 
+    def has_parented_chunks(self, document_id: str) -> bool:
+        """Whether the document's chunks use the v2 parent/child shape."""
+        chunk_list = self.chunks.get(document_id, [])
+        return any(chunk.chunk_kind is not None for chunk, _scope, _owner in chunk_list)
+
     def search(
         self,
         query_embedding: list[float],
@@ -143,8 +149,13 @@ class InMemoryRagStore:
         shared_scope: str,
         top_k: int,
     ) -> list[RetrievedChunk]:
-        """Cosine-ranked chunks from tenant docs plus shared-scope docs."""
-        hits: list[tuple[float, RetrievedChunk]] = []
+        """Rank children (and legacy chunks) by cosine; return unique parents.
+
+        Mirrors PGRagStore.search: v2 children rank, their parents return
+        (best score per parent); v1 chunks (kind None) pass through.
+        """
+        hits: dict[tuple[str, str], tuple[float, RetrievedChunk]] = {}
+        legacy: list[tuple[float, RetrievedChunk]] = []
         for document_id, chunk_list in self.chunks.items():
             record = self.documents.get(document_id)
             if record is None:
@@ -155,19 +166,45 @@ class InMemoryRagStore:
             )
             if not in_scope:
                 continue
+            parents_by_hash = {
+                chunk.chunk_hash: chunk
+                for chunk, _scope, _owner in chunk_list
+                if chunk.chunk_kind == PARENT_KIND
+            }
             for chunk, _scope, _owner in chunk_list:
+                if not chunk.embedding:
+                    continue
                 score = _cosine(query_embedding, chunk.embedding)
-                hits.append(
-                    (
-                        score,
-                        RetrievedChunk(
-                            document=record.filename,
-                            page_number=chunk.page_number,
-                            section_title=chunk.section_title,
-                            chunk_text=chunk.chunk_text,
-                            score=round(score, 4),
-                        ),
+                if chunk.chunk_kind == CHILD_KIND:
+                    parent = parents_by_hash.get(chunk.parent_hash or "")
+                    if parent is None:
+                        continue
+                    key = (document_id, parent.chunk_hash)
+                    current = hits.get(key)
+                    if current is None or score > current[0]:
+                        hits[key] = (
+                            score,
+                            RetrievedChunk(
+                                document=record.filename,
+                                page_number=parent.page_number,
+                                section_title=parent.section_title,
+                                chunk_text=parent.chunk_text,
+                                score=round(score, 4),
+                            ),
+                        )
+                elif chunk.chunk_kind is None:
+                    legacy.append(
+                        (
+                            score,
+                            RetrievedChunk(
+                                document=record.filename,
+                                page_number=chunk.page_number,
+                                section_title=chunk.section_title,
+                                chunk_text=chunk.chunk_text,
+                                score=round(score, 4),
+                            ),
+                        )
                     )
-                )
-        hits.sort(key=lambda pair: pair[0], reverse=True)
-        return [chunk for _score, chunk in hits[:top_k]]
+        merged = list(chain(hits.values(), legacy))
+        merged.sort(key=lambda pair: pair[0], reverse=True)
+        return [chunk for _score, chunk in merged[:top_k]]

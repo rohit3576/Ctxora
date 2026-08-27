@@ -199,6 +199,7 @@ class RagConfig(BaseModel):
     shared_scope: str = "shared"
     query_rewrite: bool = True
     rewrite_history_turns: int = 3
+    chunking_v2: bool = False
     advisor_template: str = (
         "Analyze this incident and explain: probable causes, consequences, "
         "actions, checklist, and whether operation can continue."

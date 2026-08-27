@@ -53,6 +53,9 @@ rag:
   shared_scope: shared
   query_rewrite: true              # R2: rewrite follow-ups with session context
   rewrite_history_turns: 3         # how many prior turns feed the rewrite
+  chunking_v2: true                # R4d: parent/child chunks — children embedded,
+                                   # whole-section parents returned; tables split
+                                   # on row boundaries only, header repeated
   advisor_template: >-
     Analyze this incident and explain: probable causes, consequences,
     actions, checklist, and whether operation can continue.
