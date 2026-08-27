@@ -2,22 +2,40 @@
 
 import logging
 from collections.abc import Callable
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, Form, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from api.schemas import Envelope
 from config.settings import RagConfig
 from llm.client import LLMClient
-from rag.contracts import DocumentRecord, RagStore
+from rag.contracts import (
+    DEVICE_MODEL_KEY,
+    FIRMWARE_VERSION_KEY,
+    DocumentRecord,
+    RagStore,
+)
 from rag.ingest import IngestError, ingest
 from rag.parsers import UnsupportedFormatError
 
 _logger = logging.getLogger("ctxora.documents")
 
-IngestFn = Callable[[str, str, bytes], DocumentRecord]
+IngestFn = Callable[..., DocumentRecord]
+_JSON_MAP: TypeAdapter[dict[str, str]] = TypeAdapter(dict[str, str])
+
+
+class UploadForm(BaseModel):
+    """Multipart upload fields (wire names stay camelCase)."""
+
+    tenant: str
+    file: UploadFile
+    docFamily: str | None = None
+    docVersion: str | None = None
+    deviceModel: str | None = None
+    firmwareVersion: str | None = None
+    metadata: str | None = None
 
 
 class DocumentView(BaseModel):
@@ -40,14 +58,53 @@ def _failure(status_code: int, error_type: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=content)
 
 
+def _upload_metadata(
+    device_model: str | None, firmware_version: str | None, metadata_json: str | None
+) -> tuple[dict[str, str] | None, str | None]:
+    """Fold form metadata into one flat map; (metadata, error_detail)."""
+    folded: dict[str, str] = {}
+    if device_model is not None:
+        folded[DEVICE_MODEL_KEY] = device_model
+    if firmware_version is not None:
+        folded[FIRMWARE_VERSION_KEY] = firmware_version
+    if metadata_json is not None and metadata_json.strip():
+        try:
+            parsed = _JSON_MAP.validate_json(metadata_json)
+        except ValidationError:
+            return None, "metadata must be a JSON object of string values"
+        overlap = folded.keys() & parsed.keys()
+        if overlap:
+            return None, f"metadata keys collide with form fields: {sorted(overlap)}"
+        folded.update(parsed)
+    return (folded or None), None
+
+
 def build_ingest_fn(
     rag_store: RagStore, llm: LLMClient, config: RagConfig, embedding_model: str
 ) -> IngestFn:
     """Bind the ingest dependencies into one callable."""
 
-    def ingest_for(tenant: str, filename: str, content: bytes) -> DocumentRecord:
+    def ingest_for(
+        tenant: str,
+        filename: str,
+        content: bytes,
+        doc_family: str | None = None,
+        doc_version: str | None = None,
+        metadata: dict[str, str] | None = None,
+    ) -> DocumentRecord:
         """Run ingestion for one upload."""
-        return ingest(rag_store, llm, config, tenant, filename, content, embedding_model)
+        return ingest(
+            rag_store,
+            llm,
+            config,
+            tenant,
+            filename,
+            content,
+            embedding_model,
+            doc_family=doc_family,
+            doc_version=doc_version,
+            metadata=metadata,
+        )
 
     return ingest_for
 
@@ -55,12 +112,24 @@ def build_ingest_fn(
 def build_documents_router(rag_store: RagStore, ingest_fn: IngestFn) -> APIRouter:
     """Build the document management router with deps closed over."""
 
-    def upload(tenant: str = Form(...), file: UploadFile = File(...)) -> JSONResponse:
+    def upload(form: Annotated[UploadForm, Form()]) -> JSONResponse:
         """Parse, chunk, embed, and store one document."""
-        filename = file.filename or "upload"
-        content = file.file.read()
+        filename = form.file.filename or "upload"
+        content = form.file.file.read()
+        flat_metadata, metadata_error = _upload_metadata(
+            form.deviceModel, form.firmwareVersion, form.metadata
+        )
+        if metadata_error is not None:
+            return _failure(400, "INVALID_METADATA", metadata_error)
         try:
-            record = ingest_fn(tenant, filename, content)
+            record = ingest_fn(
+                form.tenant,
+                filename,
+                content,
+                doc_family=form.docFamily,
+                doc_version=form.docVersion,
+                metadata=flat_metadata,
+            )
         except UnsupportedFormatError as exc:
             return _failure(415, "UNSUPPORTED_FORMAT", str(exc))
         except IngestError as exc:

@@ -9,7 +9,7 @@ from pydantic import TypeAdapter
 
 from config.settings import RagConfig
 from llm.client import LLMClient
-from rag.contracts import RagStore, RetrievedChunk
+from rag.contracts import RagFilters, RagStore, RetrievedChunk
 from rag.rewrite import rewrite_query
 
 _logger = logging.getLogger("ctxora.rag")
@@ -38,17 +38,19 @@ def retrieve(
     tenant: str,
     question: str,
     recent_turns: Sequence[str] = (),
+    filters: RagFilters | None = None,
 ) -> list[RetrievedChunk]:
     """Embed the (session-rewritten when enabled) question and search scopes.
 
     Rewrite fires only when the flag is on AND turns exist: the stateless
-    path never pays an extra LLM call.
+    path never pays an extra LLM call. filters, when set, restrict search
+    to documents whose metadata contains every constraint.
     """
     query = question
     if config.query_rewrite and recent_turns:
         query = rewrite_query(llm, question, recent_turns[-config.rewrite_history_turns :])
     query_embedding = llm.embed([query])[0]
-    return store.search(query_embedding, tenant, config.shared_scope, config.top_k)
+    return store.search(query_embedding, tenant, config.shared_scope, config.top_k, filters)
 
 
 def answer_grounded(

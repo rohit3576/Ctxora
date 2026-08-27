@@ -199,6 +199,8 @@ fixable = ["ALL"]
     "N815",     # camelCase fields are the public wire contract
     "B008",     # FastAPI File(...) default is the framework's upload idiom
     "PLC0415",  # keep office-format imports lazy
+    "PLR0913",  # upload closure forwards the full ingest tuple by contract
+    "PLR0917",  # same
 ]
 
 "api/rag.py" = [

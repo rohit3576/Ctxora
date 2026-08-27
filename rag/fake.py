@@ -9,7 +9,14 @@ from dataclasses import replace
 from itertools import chain
 
 from llm.client import GenResult
-from rag.contracts import CHILD_KIND, PARENT_KIND, ChunkInsert, DocumentRecord, RetrievedChunk
+from rag.contracts import (
+    CHILD_KIND,
+    PARENT_KIND,
+    ChunkInsert,
+    DocumentRecord,
+    RagFilters,
+    RetrievedChunk,
+)
 
 _EMBED_DIM: int = 1536  # must match rag_chunks.embedding VECTOR(1536)
 _TOKEN: re.Pattern[str] = re.compile(r"[a-z0-9][a-z0-9.-]*")
@@ -75,6 +82,13 @@ def _cosine(left: list[float], right: list[float]) -> float:
     return dot / (norm_left * norm_right)
 
 
+def _matches(record: DocumentRecord, containment: dict[str, str]) -> bool:
+    """Whether the record's metadata contains every filter constraint."""
+    if record.metadata is None:
+        return False
+    return all(record.metadata.get(key) == value for key, value in containment.items())
+
+
 class InMemoryRagStore:
     """Dict-backed store computing cosine scores directly."""
 
@@ -97,6 +111,7 @@ class InMemoryRagStore:
         doc_version: str | None = None,
         supersede_ids: tuple[str, ...] = (),
         status: str = "ACTIVE",
+        metadata: dict[str, str] | None = None,
     ) -> DocumentRecord | None:
         """Persist document + chunks; None when the hash already exists."""
         if self.find_by_hash(tenant, file_hash) is not None:
@@ -117,6 +132,7 @@ class InMemoryRagStore:
             doc_family=doc_family,
             doc_version=doc_version,
             status=status,
+            metadata=dict(metadata) if metadata else None,
         )
         self.documents[document_id] = record
         self.chunks[document_id] = [(chunk, scope, tenant) for chunk in chunks]
@@ -162,12 +178,15 @@ class InMemoryRagStore:
         tenant: str,
         shared_scope: str,
         top_k: int,
+        filters: RagFilters | None = None,
     ) -> list[RetrievedChunk]:
         """Rank children (and legacy chunks) by cosine; return unique parents.
 
         Mirrors PGRagStore.search: v2 children rank, their parents return
-        (best score per parent); v1 chunks (kind None) pass through.
+        (best score per parent); v1 chunks (kind None) pass through;
+        filters apply metadata containment per document.
         """
+        containment = filters.containment() if filters is not None else {}
         hits: dict[tuple[str, str], tuple[float, RetrievedChunk]] = {}
         legacy: list[tuple[float, RetrievedChunk]] = []
         for document_id, chunk_list in self.chunks.items():
@@ -175,6 +194,8 @@ class InMemoryRagStore:
             if record is None or record.status != "ACTIVE":
                 continue
             if not self._in_scope(document_id, record, tenant, shared_scope):
+                continue
+            if containment and not _matches(record, containment):
                 continue
             self._rank_document(document_id, record, chunk_list, query_embedding, hits, legacy)
         merged = list(chain(hits.values(), legacy))

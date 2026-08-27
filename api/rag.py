@@ -12,12 +12,30 @@ from api.schemas import Envelope
 from config.settings import RagConfig
 from llm.client import LLMClient
 from memory.contracts import MemoryStore
-from rag.contracts import RagStore
+from rag.contracts import RagFilters, RagStore
 from rag.rag_flow import UngroundedError, advise, answer_grounded, retrieve
 
 _logger = logging.getLogger("ctxora.rag_api")
 
 _ROW_TYPE = dict[str, float | int | str | bool | None]
+
+
+class RagQueryFilters(BaseModel):
+    """Metadata constraints that make wrong manuals unreachable."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    deviceModel: str | None = None
+    firmwareVersion: str | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    def to_rag_filters(self) -> RagFilters:
+        """Fold into the store-level filter contract."""
+        return RagFilters(
+            device_model=self.deviceModel,
+            firmware_version=self.firmwareVersion,
+            metadata=dict(self.metadata),
+        )
 
 
 class RAGQueryRequest(BaseModel):
@@ -28,6 +46,7 @@ class RAGQueryRequest(BaseModel):
     tenant: str = Field(min_length=1, max_length=50)
     question: str = Field(min_length=1, max_length=2000)
     sessionId: str | None = None
+    filters: RagQueryFilters | None = None
 
 
 class SourceView(BaseModel):
@@ -97,7 +116,15 @@ def build_rag_router(
                 if memory is not None
                 else []
             )
-            chunks = retrieve(rag_store, llm, config, request.tenant, request.question, turns)
+            chunks = retrieve(
+                rag_store,
+                llm,
+                config,
+                request.tenant,
+                request.question,
+                turns,
+                request.filters.to_rag_filters() if request.filters is not None else None,
+            )
         except Exception as exc:  # noqa: BLE001 (boundary: store outage -> typed 503)
             _logger.warning("rag store unavailable: %s", exc)
             return _failure(503, "RAG_STORE_UNAVAILABLE", str(exc).splitlines()[0])

@@ -32,6 +32,7 @@ def ingest(
     embedding_model: str,
     doc_family: str | None = None,
     doc_version: str | None = None,
+    metadata: dict[str, str] | None = None,
 ) -> DocumentRecord:
     """Ingest one uploaded document; re-upload of the same hash is a no-op.
 
@@ -41,7 +42,7 @@ def ingest(
     an ACTIVE sibling stores the document born SUPERSEDED — obsolete
     manuals can never surface in search.
 
-    Re-uploading with a different chunker version or family/version
+    Re-uploading with a different chunker version, family/version, or
     metadata than the stored document re-chunks it.
 
     Raises:
@@ -58,7 +59,11 @@ def ingest(
     existing = store.find_by_hash(tenant, file_hash)
     if existing is not None:
         same_chunker = store.has_parented_chunks(existing.id) == config.chunking_v2
-        same_meta = existing.doc_family == doc_family and existing.doc_version == doc_version
+        same_meta = (
+            existing.doc_family == doc_family
+            and existing.doc_version == doc_version
+            and existing.metadata == (dict(metadata) if metadata else None)
+        )
         if same_chunker and same_meta:
             _logger.info("document %s already ingested for %s (hash match)", filename, tenant)
             return existing
@@ -142,6 +147,7 @@ def ingest(
         doc_version=doc_version,
         supersede_ids=supersede_ids,
         status=status,
+        metadata=metadata,
     )
     if record is None:
         msg = "document disappeared during save"

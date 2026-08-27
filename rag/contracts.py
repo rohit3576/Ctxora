@@ -1,11 +1,36 @@
-"""RAG contracts: documents, chunks, retrieval, and the RagStore protocol."""
+"""RAG contracts: documents, chunks, retrieval, filters, and the RagStore protocol."""
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 PARENT_KIND = "PARENT"
 CHILD_KIND = "CHILD"
+DEVICE_MODEL_KEY = "deviceModel"
+FIRMWARE_VERSION_KEY = "firmwareVersion"
+
+
+@dataclass(frozen=True, slots=True)
+class RagFilters:
+    """Deterministic retrieval filters: metadata containment on documents.
+
+    deviceModel and firmwareVersion are sugar for the same-named metadata
+    keys; `metadata` adds free-form key/value constraints. A document
+    matches only when its metadata contains every constraint.
+    """
+
+    device_model: str | None = None
+    firmware_version: str | None = None
+    metadata: dict[str, str] = field(default_factory=dict)
+
+    def containment(self) -> dict[str, str]:
+        """Fold every constraint into one flat key/value map."""
+        folded = dict(self.metadata)
+        if self.device_model is not None:
+            folded[DEVICE_MODEL_KEY] = self.device_model
+        if self.firmware_version is not None:
+            folded[FIRMWARE_VERSION_KEY] = self.firmware_version
+        return folded
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +67,7 @@ class DocumentRecord:
     doc_family: str | None = None
     doc_version: str | None = None
     status: str = "ACTIVE"
+    metadata: dict[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,12 +98,13 @@ class RagStore(Protocol):
         doc_version: str | None = None,
         supersede_ids: tuple[str, ...] = (),
         status: str = "ACTIVE",
+        metadata: dict[str, str] | None = None,
     ) -> DocumentRecord | None:
         """Persist document + chunks; None when the hash already exists.
 
         supersede_ids flip to SUPERSEDED in the same transaction as the
         document insert; status lets an already-obsolete upload be born
-        SUPERSEDED.
+        SUPERSEDED; metadata is the flat string map filters match against.
         """
         ...
 
@@ -103,6 +130,12 @@ class RagStore(Protocol):
         tenant: str,
         shared_scope: str,
         top_k: int,
+        filters: RagFilters | None = None,
     ) -> list[RetrievedChunk]:
-        """Cosine-ranked chunks from tenant docs plus shared-scope docs."""
+        """Cosine-ranked chunks from tenant docs plus shared-scope docs.
+
+        filters, when set and non-empty, restrict results to documents
+        whose metadata contains every constraint (wrong manuals become
+        deterministically unreachable).
+        """
         ...

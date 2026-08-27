@@ -1,13 +1,24 @@
 """PostgreSQL RagStore: pgvector storage with cosine search."""
 
 import datetime
+import json
 import uuid
 from itertools import chain
 
+from pydantic import TypeAdapter, ValidationError
+
 from knowledge.store import Query
-from rag.contracts import CHILD_KIND, PARENT_KIND, ChunkInsert, DocumentRecord, RetrievedChunk
+from rag.contracts import (
+    CHILD_KIND,
+    PARENT_KIND,
+    ChunkInsert,
+    DocumentRecord,
+    RagFilters,
+    RetrievedChunk,
+)
 
 _OVERSAMPLE_FACTOR = 3
+_METADATA_ADAPTER = TypeAdapter(dict[str, str])
 
 _CHILD_SEARCH_SQL = (
     "SELECT p.id, d.filename, p.page_number, p.section_title, p.chunk_text, "
@@ -27,6 +38,27 @@ _LEGACY_SEARCH_SQL = (
     "FROM rag_chunks c JOIN rag_documents d ON d.id = c.document_id "
     "WHERE (c.tenant = %s OR (c.tenant IS DISTINCT FROM %s AND c.scope = %s)) "
     "AND c.chunk_kind IS NULL AND d.status = 'ACTIVE' "
+    "ORDER BY c.embedding <=> %s::vector LIMIT %s"
+)
+
+_CHILD_SEARCH_FILTERED_SQL = (
+    "SELECT p.id, d.filename, p.page_number, p.section_title, p.chunk_text, "
+    "MAX(1 - (c.embedding <=> %s::vector)) AS score "
+    "FROM rag_chunks c "
+    "JOIN rag_chunks p ON p.id = c.parent_id "
+    "JOIN rag_documents d ON d.id = p.document_id "
+    "WHERE (c.tenant = %s OR (c.tenant IS DISTINCT FROM %s AND c.scope = %s)) "
+    "AND c.chunk_kind = %s AND d.status = 'ACTIVE' AND d.metadata @> %s::jsonb "
+    "GROUP BY p.id, d.filename, p.page_number, p.section_title, p.chunk_text "
+    "ORDER BY score DESC LIMIT %s"
+)
+
+_LEGACY_SEARCH_FILTERED_SQL = (
+    "SELECT NULL, d.filename, c.page_number, c.section_title, c.chunk_text, "
+    "1 - (c.embedding <=> %s::vector) AS score "
+    "FROM rag_chunks c JOIN rag_documents d ON d.id = c.document_id "
+    "WHERE (c.tenant = %s OR (c.tenant IS DISTINCT FROM %s AND c.scope = %s)) "
+    "AND c.chunk_kind IS NULL AND d.status = 'ACTIVE' AND d.metadata @> %s::jsonb "
     "ORDER BY c.embedding <=> %s::vector LIMIT %s"
 )
 
@@ -54,15 +86,23 @@ def _vector_literal(embedding: list[float]) -> str:
     return "[" + ",".join(str(value) for value in embedding) + "]"
 
 
+def _metadata(value: object) -> dict[str, str] | None:
+    """Narrow a JSONB cell to a flat string map (None when not one)."""
+    try:
+        return _METADATA_ADAPTER.validate_python(value)
+    except ValidationError:
+        return None
+
+
 _FIND_BY_HASH_SQL = (
     "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, "
-    "created_at, doc_family, doc_version, status "
+    "created_at, doc_family, doc_version, status, metadata "
     "FROM rag_documents WHERE tenant = %s AND file_hash = %s"
 )
 
 _LIST_DOCUMENTS_SQL = (
     "SELECT id, tenant, filename, file_hash, total_pages, chunk_count, "
-    "created_at, doc_family, doc_version, status "
+    "created_at, doc_family, doc_version, status, metadata "
     "FROM rag_documents WHERE tenant = %s AND status = 'ACTIVE' "
     "ORDER BY created_at DESC"
 )
@@ -88,6 +128,7 @@ class PGRagStore:
         doc_version: str | None = None,
         supersede_ids: tuple[str, ...] = (),
         status: str = "ACTIVE",
+        metadata: dict[str, str] | None = None,
     ) -> DocumentRecord | None:
         """Persist document + chunks; None when the hash already exists."""
         if self.find_by_hash(tenant, file_hash) is not None:
@@ -105,6 +146,7 @@ class PGRagStore:
             embedding_model,
             doc_family,
             doc_version,
+            json.dumps(metadata) if metadata else None,
             created,
         )
         if supersede_ids:
@@ -114,8 +156,8 @@ class PGRagStore:
                 "WHERE tenant = %s AND id = ANY(%s) RETURNING id) "
                 "INSERT INTO rag_documents "
                 "(id, tenant, filename, file_hash, total_pages, chunk_count, "
-                "status, embedding_model, doc_family, doc_version, created_at) "
-                "SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
+                "status, embedding_model, doc_family, doc_version, metadata, created_at) "
+                "SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s"
                 " FROM (SELECT count(*) FROM supersede) AS one",
                 (tenant, list(supersede_ids), *insert_values),
             )
@@ -123,8 +165,8 @@ class PGRagStore:
             self._query(
                 "INSERT INTO rag_documents "
                 "(id, tenant, filename, file_hash, total_pages, chunk_count, "
-                "status, embedding_model, doc_family, doc_version, created_at) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "status, embedding_model, doc_family, doc_version, metadata, created_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)",
                 insert_values,
             )
         parents = [chunk for chunk in chunks if chunk.chunk_kind == PARENT_KIND]
@@ -155,6 +197,7 @@ class PGRagStore:
             doc_family=doc_family,
             doc_version=doc_version,
             status=status,
+            metadata=dict(metadata) if metadata else None,
         )
 
     def _insert_chunk(
@@ -221,20 +264,41 @@ class PGRagStore:
         tenant: str,
         shared_scope: str,
         top_k: int,
+        filters: RagFilters | None = None,
     ) -> list[RetrievedChunk]:
         """Rank children (and legacy chunks) by cosine; return unique parents.
 
         v2 documents: CHILD rows are ranked, their PARENT rows returned
         (best score per parent, oversampled 3x then deduped). v1 documents
         (chunk_kind NULL) rank directly and pass through unchanged.
+        filters restrict results to documents whose metadata contains
+        every constraint.
         """
         vector = _vector_literal(query_embedding)
         scope_params = (tenant, tenant, shared_scope)
-        child_rows = self._query(
-            _CHILD_SEARCH_SQL,
-            (vector, *scope_params, CHILD_KIND, top_k * _OVERSAMPLE_FACTOR),
-        )
-        legacy_rows = self._query(_LEGACY_SEARCH_SQL, (vector, *scope_params, vector, top_k))
+        containment = filters.containment() if filters is not None else {}
+        if containment:
+            containment_json = json.dumps(containment)
+            child_rows = self._query(
+                _CHILD_SEARCH_FILTERED_SQL,
+                (
+                    vector,
+                    *scope_params,
+                    CHILD_KIND,
+                    containment_json,
+                    top_k * _OVERSAMPLE_FACTOR,
+                ),
+            )
+            legacy_rows = self._query(
+                _LEGACY_SEARCH_FILTERED_SQL,
+                (vector, *scope_params, containment_json, vector, top_k),
+            )
+        else:
+            child_rows = self._query(
+                _CHILD_SEARCH_SQL,
+                (vector, *scope_params, CHILD_KIND, top_k * _OVERSAMPLE_FACTOR),
+            )
+            legacy_rows = self._query(_LEGACY_SEARCH_SQL, (vector, *scope_params, vector, top_k))
         merged = [
             (
                 _text(row[0]),
@@ -279,4 +343,5 @@ class PGRagStore:
             doc_family=_text(row[7]) or None,
             doc_version=_text(row[8]) or None,
             status=_text(row[9]) or "ACTIVE",
+            metadata=_metadata(row[10]),
         )

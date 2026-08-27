@@ -13,7 +13,7 @@ from llm.client import GenResult
 from main import create_app
 from memory.contracts import Session, TurnInsert
 from memory.fake import InMemoryMemoryStore
-from rag.contracts import RetrievedChunk
+from rag.contracts import RagFilters, RetrievedChunk
 from rag.fake import InMemoryRagStore
 from tests.test_pipeline_e2e import DemoFakeLLM, DemoStore, demo_knowledge_query
 
@@ -175,6 +175,107 @@ class TestRagQuery:
         assert response.status_code == 404
         body: dict[str, object] = response.json()
         assert body["errorType"] == "NO_DOCUMENTS"
+
+
+class TestMetadataFilters:
+    BRAKE: bytes = b"""# Brake Notes
+
+Brake pad wear below 3 mm requires replacement.
+"""
+
+    def _upload(self, client: TestClient, filename: str, content: bytes, device_model: str) -> None:
+        response = client.post(
+            "/v1/documents",
+            data={"tenant": "demo", "deviceModel": device_model},
+            files={"file": (filename, content, "text/markdown")},
+        )
+        assert response.status_code == 200
+
+    def test_filtered_query_cites_only_matching_device(
+        self, harness: tuple[TestClient, InMemoryRagStore, RoutingLLM]
+    ) -> None:
+        client, _rag, _llm = harness
+        self._upload(client, "coolant.md", MANUAL, "Sensor-A")
+        self._upload(client, "brakes.md", self.BRAKE, "Sensor-B")
+
+        response = client.post(
+            "/v1/rag/query",
+            json={
+                "tenant": "demo",
+                "question": "what is the acceptable coolant temperature range?",
+                "filters": {"deviceModel": "Sensor-B"},
+            },
+        )
+
+        assert response.status_code == 200
+        envelope = Envelope[RAGAnswerData].model_validate_json(response.content)
+        assert envelope.data is not None
+        assert envelope.data.sources
+        assert all(source.document == "brakes.md" for source in envelope.data.sources)
+
+        response = client.post(
+            "/v1/rag/query",
+            json={
+                "tenant": "demo",
+                "question": "what is the acceptable coolant temperature range?",
+                "filters": {"deviceModel": "Sensor-A"},
+            },
+        )
+
+        assert response.status_code == 200
+        envelope = Envelope[RAGAnswerData].model_validate_json(response.content)
+        assert envelope.data is not None
+        assert envelope.data.sources
+        assert all(source.document == "coolant.md" for source in envelope.data.sources)
+
+    def test_filter_matching_nothing_is_404(
+        self, harness: tuple[TestClient, InMemoryRagStore, RoutingLLM]
+    ) -> None:
+        client, _rag, _llm = harness
+        self._upload(client, "coolant.md", MANUAL, "Sensor-A")
+
+        response = client.post(
+            "/v1/rag/query",
+            json={
+                "tenant": "demo",
+                "question": "what is the acceptable coolant temperature range?",
+                "filters": {"deviceModel": "Sensor-Z"},
+            },
+        )
+
+        assert response.status_code == 404
+        body: dict[str, object] = response.json()
+        assert body["errorType"] == "NO_DOCUMENTS"
+
+    def test_upload_rejects_non_string_metadata_values(
+        self, harness: tuple[TestClient, InMemoryRagStore, RoutingLLM]
+    ) -> None:
+        client, _rag, _llm = harness
+
+        response = client.post(
+            "/v1/documents",
+            data={"tenant": "demo", "metadata": '{"fleetSize": 12}'},
+            files={"file": ("coolant.md", MANUAL, "text/markdown")},
+        )
+
+        assert response.status_code == 400
+        body: dict[str, object] = response.json()
+        assert body["errorType"] == "INVALID_METADATA"
+
+    def test_upload_rejects_form_and_json_key_collision(
+        self, harness: tuple[TestClient, InMemoryRagStore, RoutingLLM]
+    ) -> None:
+        client, _rag, _llm = harness
+
+        response = client.post(
+            "/v1/documents",
+            data={"tenant": "demo", "deviceModel": "A", "metadata": '{"deviceModel": "B"}'},
+            files={"file": ("coolant.md", MANUAL, "text/markdown")},
+        )
+
+        assert response.status_code == 400
+        body: dict[str, object] = response.json()
+        assert body["errorType"] == "INVALID_METADATA"
 
 
 class TestSessionFollowup:
@@ -340,6 +441,7 @@ class TestOutageBoundaries:
                 tenant: str,
                 shared_scope: str,
                 top_k: int,
+                filters: RagFilters | None = None,
             ) -> list[RetrievedChunk]:
                 msg = "connection refused"
                 raise RuntimeError(msg)
@@ -375,6 +477,7 @@ class TestOutageBoundaries:
                 tenant: str,
                 shared_scope: str,
                 top_k: int,
+                filters: RagFilters | None = None,
             ) -> list[RetrievedChunk]:
                 msg = "connection refused"
                 raise RuntimeError(msg)

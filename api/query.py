@@ -22,6 +22,7 @@ from agent.pipeline import (
 )
 from api.auth import TenantAuth, UnauthorizedError
 from api.flow import conversation_context, rag_recent_turns, record_turn, resolve_session
+from api.rag import RagQueryFilters
 from api.ratelimit import TokenBucketLimiter
 from api.schemas import Envelope
 from feedback.contracts import FeedbackStore
@@ -52,6 +53,8 @@ class SQLQueryRequest(BaseModel):
 
 class UnifiedQueryRequest(SQLQueryRequest):
     """One question routed to SQL, RAG, or both."""
+
+    filters: RagQueryFilters | None = None
 
 
 class QueryResponseData(BaseModel):
@@ -222,10 +225,19 @@ def _rag_answer(
     tenant: str,
     question: str,
     recent_turns: Sequence[str] = (),
+    filters: RagQueryFilters | None = None,
 ) -> dict[str, object] | None:
     """Grounded doc answer; None when unavailable or ungrounded (logged)."""
     try:
-        chunks = retrieve(rag_store, deps.llm, deps.config.rag, tenant, question, recent_turns)
+        chunks = retrieve(
+            rag_store,
+            deps.llm,
+            deps.config.rag,
+            tenant,
+            question,
+            recent_turns,
+            filters.to_rag_filters() if filters is not None else None,
+        )
         if not chunks:
             return None
         text, sources = answer_grounded(deps.llm, question, chunks)
@@ -251,7 +263,7 @@ def _unified_rag_part(
     if rag_store is None or intent not in ("docs", "hybrid"):
         return None
     rag_turns = rag_recent_turns(memory, request.tenant, request.sessionId)
-    return _rag_answer(deps, rag_store, request.tenant, request.query, rag_turns)
+    return _rag_answer(deps, rag_store, request.tenant, request.query, rag_turns, request.filters)
 
 
 def build_query_router(
@@ -319,6 +331,7 @@ def build_query_router(
             tenant=effective.tenant,
             query=effective.query,
             sessionId=effective.sessionId,
+            filters=request.filters,
         )
         decision: RouteDecision = classify(request.query, deps.config.routing)
         rag_part = _unified_rag_part(deps, rag_store, memory, effective_unified, decision.intent)

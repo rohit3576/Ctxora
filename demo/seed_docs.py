@@ -34,6 +34,12 @@ HASH_EMBEDDING_MODEL = "hash-embed-1536"
 
 _FAMILY_PATTERN: re.Pattern[str] = re.compile(r"^(?P<family>.+-manual)-v(?P<version>[0-9.]+)$")
 
+DEVICE_MODELS: dict[str, str] = {
+    "door-sensor-ds200-manual": "DS-200",
+    "refrigeration-ru500-manual": "RU-500",
+    "gps-tracker-gt800-manual": "GT-800",
+}
+
 
 def _family_version(filename: str) -> tuple[str, str] | None:
     """door-sensor-ds200-manual-v2.md -> ("door-sensor-ds200-manual", "2")."""
@@ -57,6 +63,7 @@ def seed_documents(
             embedding_model=embedding_model,
             doc_family=meta[0] if meta else None,
             doc_version=meta[1] if meta else None,
+            metadata={"deviceModel": DEVICE_MODELS[meta[0]]} if meta else None,
         )
         print(
             f"{name}: {record.chunk_count} chunks / {record.total_pages} pages"
